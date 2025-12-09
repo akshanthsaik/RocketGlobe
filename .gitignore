@@ -1,0 +1,62 @@
+# Dependencies
+node_modules/
+backend/venv/
+backend/__pycache__/
+backend/app/__pycache__/
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+target/
+*.local
+
+# Environment variables
+.env
+.env.local
+.env.production
+backend/.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.coverage
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Tauri
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# Cesium
+public/cesium/
+
+# Temp files
+*.tmp
+.temp/

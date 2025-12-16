@@ -8,7 +8,7 @@ class Launch(Base, TimestampMixin):
     id = Column(Integer, primary_key=True, index=True)
     ll2_id = Column(String(100), unique=True, index=True)  # UUID from LL2
     name = Column(String(500), nullable=False, index=True)
-    
+    image_url = Column(Text)
     # Status
     status = Column(String(50), index=True)  # Success, Failure, TBD, Go, etc.
     net = Column(DateTime, index=True)  # No Earlier Than (launch time)

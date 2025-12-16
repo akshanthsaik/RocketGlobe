@@ -2,15 +2,16 @@ from sqlalchemy import Column, Integer, String, Text, Float, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from .base import Base, TimestampMixin
 
+
 class Rocket(Base, TimestampMixin):
     __tablename__ = "rockets"
 
     id = Column(Integer, primary_key=True, index=True)
     ll2_id = Column(Integer, unique=True, index=True)
-    name = Column(String(255), nullable=False, index=True)
-    family = Column(String(255))
-    full_name = Column(String(500))
-    variant = Column(String(255))
+    name = Column(Text, nullable=False, index=True)
+    family = Column(Text)
+    full_name = Column(Text)
+    variant = Column(Text)
     description = Column(Text)
     
     # Specifications
@@ -24,5 +25,6 @@ class Rocket(Base, TimestampMixin):
     is_reusable = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
     
+    # Manufacturer info
     manufacturer_id = Column(Integer, ForeignKey("agencies.id"))
     manufacturer = relationship("Agency", backref="rockets")

@@ -1,0 +1,52 @@
+/* src/components/Sidebar/views/PadDetailView.css */
+.pad-header {
+  margin-bottom: var(--space-6);
+}
+
+.pad-name {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.pad-country {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+}
+
+.stat-box {
+  padding: var(--space-4);
+  background: var(--bg-dark);
+  border: 1px solid var(--border-normal);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.stat-box .stat-value {
+  font-size: var(--text-2xl);
+  font-weight: var(--weight-bold);
+  color: var(--accent-primary);
+  font-family: var(--font-mono);
+  margin-bottom: var(--space-1);
+}
+
+.stat-box .stat-label {
+  font-size: var(--text-xs);
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.launch-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}

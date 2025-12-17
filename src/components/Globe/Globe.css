@@ -1,0 +1,45 @@
+/* src/components/Globe/Globe.css */
+.globe-container {
+  position: fixed;
+  top: 64px;
+  left: 380px;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  background: #000;
+  transition: left 0.3s ease;
+}
+
+
+/* When timeline is active, adjust bottom */
+.app:has(.timeline-container) .globe-container {
+  bottom: 90px;
+}
+
+.cesium-viewer {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Hide Cesium branding */
+.cesium-viewer .cesium-viewer-bottom {
+  display: none !important;
+}
+
+.cesium-credit-logoContainer {
+  display: none !important;
+}
+
+.cesium-credit-textContainer {
+  display: none !important;
+}
+
+/* Ensure canvas takes full size */
+.cesium-viewer canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

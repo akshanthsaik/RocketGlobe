@@ -1,0 +1,137 @@
+/* ============================================================================
+   GLOBAL STYLES
+   ============================================================================ */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  font-weight: var(--weight-normal);
+  color: var(--text-primary);
+  background: var(--bg-dark);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-dark);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-normal);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-focus);
+}
+
+/* ===== TEXT SELECTION ===== */
+::selection {
+  background: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+/* ===== FOCUS STATES ===== */
+:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
+
+/* ===== BUTTONS ===== */
+button {
+  font-family: inherit;
+  font-size: inherit;
+  border: none;
+  background: none;
+  cursor: pointer;
+  color: inherit;
+  transition: all var(--transition-fast);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* ===== INPUTS ===== */
+input {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-normal);
+  border-radius: 4px;
+  padding: var(--space-2) var(--space-3);
+  transition: border-color var(--transition-fast);
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+}
+
+input::placeholder {
+  color: var(--text-tertiary);
+}
+
+/* ===== LINKS ===== */
+a {
+  color: var(--accent-primary);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--accent-cyan);
+}
+
+/* ===== MONO TEXT ===== */
+code,
+pre,
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* ===== UTILITY CLASSES ===== */
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clickable {
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.clickable:hover {
+  background-color: var(--bg-hover);
+}
+
+.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}

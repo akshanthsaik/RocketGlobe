@@ -1,0 +1,42 @@
+/* src/components/Sidebar/views/RocketDetailView.css */
+.rocket-header {
+  margin-bottom: var(--space-6);
+}
+
+.rocket-name {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  color: var(--text-primary);
+  margin: 0 0 var(--space-3) 0;
+}
+
+.rocket-status {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.active {
+  background: rgba(16, 185, 129, 0.15);
+  color: var(--status-go);
+}
+
+.status-badge.inactive {
+  background: rgba(107, 114, 128, 0.15);
+  color: var(--text-tertiary);
+}
+
+.rocket-description {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.6;
+  margin: 0;
+}

@@ -6,12 +6,12 @@ class Agency(Base, TimestampMixin):
 
     id = Column(Integer, primary_key=True, index=True)
     ll2_id = Column(Integer, unique=True, index=True)
-    name = Column(Text, nullable=False, index=True)  # No limit
-    abbrev = Column(Text)  # No limit
-    type = Column(Text)  # No limit
-    country_code = Column(Text, index=True)  # No limit
+    name = Column(Text, nullable=False, index=True)
+    abbrev = Column(Text)
+    type = Column(Text)
+    country_code = Column(Text, index=True)
     description = Column(Text)
-    administrator = Column(Text)  # No limit
+    administrator = Column(Text)
     founding_year = Column(Integer)
-    logo_url = Column(Text)  # No limit
+    logo_url = Column(Text)
     is_active = Column(Boolean, default=True)

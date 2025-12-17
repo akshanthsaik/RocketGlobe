@@ -201,20 +201,17 @@ async def sync_rockets(client: LL2Client, db: Session) -> int:
 
 
 async def sync_launches(client: LL2Client, db: Session) -> int:
-    """Sync launches from LL2 to database."""
-    logger.info("🚀 Syncing launches...")
+    """Sync ALL launches from LL2 to database - full history."""
+    logger.info("🚀 Syncing ALL launches from history...")
     count = 0
     offset = 0
     limit = 100
     
-    # Get launches from the past year
-    start_date = (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d")
-    
     while True:
         data = await client.get_launches(
             limit=limit, 
-            offset=offset,
-            net__gte=start_date
+            offset=offset
+            # NO filters - get everything from first rocket to today
         )
         results = data.get("results", [])
         
@@ -274,17 +271,22 @@ async def sync_launches(client: LL2Client, db: Session) -> int:
             count += 1
         
         db.commit()
+        
+        # Log progress every 100 launches
+        if count % 100 == 0:
+            logger.info(f"✅ Synced {count} launches so far...")
+        
         offset += limit
         
-        # Limit to 1000 launches for now
-        if offset >= 1000:
-            break
-        
-        if offset >= data.get("count", 0):
+        # Check if we've reached the end
+        total_count = data.get("count", 0)
+        if offset >= total_count:
+            logger.info(f"📊 Reached end: {count}/{total_count} launches")
             break
     
-    logger.info(f"✅ Synced {count} launches")
+    logger.info(f"🎉 COMPLETE! Synced {count} total launches")
     return count
+
 
 
 async def sync_all(db: Session) -> dict:

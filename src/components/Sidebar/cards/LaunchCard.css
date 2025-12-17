@@ -1,0 +1,72 @@
+/* src/components/Sidebar/cards/LaunchCard.css */
+.launch-card {
+  padding: var(--space-4);
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.launch-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(59, 130, 246, 0.5);
+  transform: translateX(2px);
+}
+
+.launch-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.launch-card-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.status-chip {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.status-chip.green {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.status-chip.blue {
+  background: rgba(59, 130, 246, 0.2);
+  color: #3b82f6;
+}
+
+.status-chip.orange {
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+.status-chip.red {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.status-chip.gray {
+  background: rgba(107, 114, 128, 0.2);
+  color: #9ca3af;
+}
+
+.launch-card-date {
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}

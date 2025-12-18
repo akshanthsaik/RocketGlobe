@@ -1,27 +1,27 @@
 // src/components/Sidebar/tabs/PadsTab.tsx
-import { useMemo, useState } from 'react';
-import { useLaunchStore } from '../../../store/launchStore';
-import './PadsTab.css';
+import { useMemo, useState } from "react";
+import { useLaunchStore } from "../../../store/launchStore";
+import "./PadsTab.css";
 
 export function PadsTab() {
-  const pads = useLaunchStore(state => state.pads);
-  const launches = useLaunchStore(state => state.launches);
-  const navigateToPad = useLaunchStore(state => state.navigateToPad);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'name' | 'launches'>('launches');
+  const pads = useLaunchStore((state) => state.pads);
+  const launches = useLaunchStore((state) => state.launches);
+  const navigateToPad = useLaunchStore((state) => state.navigateToPad);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"name" | "launches">("launches");
 
   const sortedPads = useMemo(() => {
-    let filtered = pads.filter(pad => 
-      pad.name.toLowerCase().includes(searchQuery.toLowerCase())
+    let filtered = pads.filter((pad) =>
+      pad.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
 
-    const padsWithCounts = filtered.map(pad => ({
+    const padsWithCounts = filtered.map((pad) => ({
       ...pad,
-      launchCount: launches.filter(l => l.pad_id === pad.id).length,
+      launchCount: launches.filter((l) => l.pad_id === pad.id).length,
     }));
 
     return padsWithCounts.sort((a, b) => {
-      if (sortBy === 'launches') {
+      if (sortBy === "launches") {
         return b.launchCount - a.launchCount;
       }
       return a.name.localeCompare(b.name);
@@ -40,14 +40,14 @@ export function PadsTab() {
         />
         <div className="sort-buttons">
           <button
-            className={`sort-btn ${sortBy === 'launches' ? 'active' : ''}`}
-            onClick={() => setSortBy('launches')}
+            className={`sort-btn ${sortBy === "launches" ? "active" : ""}`}
+            onClick={() => setSortBy("launches")}
           >
             By Activity
           </button>
           <button
-            className={`sort-btn ${sortBy === 'name' ? 'active' : ''}`}
-            onClick={() => setSortBy('name')}
+            className={`sort-btn ${sortBy === "name" ? "active" : ""}`}
+            onClick={() => setSortBy("name")}
           >
             By Name
           </button>
@@ -55,7 +55,7 @@ export function PadsTab() {
       </div>
 
       <div className="pads-list">
-        {sortedPads.map(pad => (
+        {sortedPads.map((pad) => (
           <div
             key={pad.id}
             className="pad-item"

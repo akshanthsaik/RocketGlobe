@@ -1,31 +1,31 @@
 // src/components/Sidebar/Sidebar.tsx
-import { useState, useRef, useEffect } from 'react';
-import { useLaunchStore } from '../../store/launchStore';
-import { LaunchDetailView } from './views/LaunchDetailView';
-import { PadDetailView } from './views/PadDetailView';
-import { RocketDetailView } from './views/RocketDetailView';
-import { AgencyDetailView } from './views/AgencyDetailView';
-import { LaunchTab } from './tabs/LaunchTab';
-import { PadsTab } from './tabs/PadsTab';
-import { RocketsTab } from './tabs/RocketsTab';
-import { AgenciesTab } from './tabs/AgenciesTab';
-import './Sidebar.css';
+import { useState, useRef, useEffect } from "react";
+import { useLaunchStore } from "../../store/launchStore";
+import { LaunchDetailView } from "./views/LaunchDetailView";
+import { PadDetailView } from "./views/PadDetailView";
+import { RocketDetailView } from "./views/RocketDetailView";
+import { AgencyDetailView } from "./views/AgencyDetailView";
+import { LaunchTab } from "./tabs/LaunchTab";
+import { PadsTab } from "./tabs/PadsTab";
+import { RocketsTab } from "./tabs/RocketsTab";
+import { AgenciesTab } from "./tabs/AgenciesTab";
+import "./Sidebar.css";
 
 export function Sidebar() {
-  const globeMode = useLaunchStore(state => state.globeMode);
-  const sidebarViewStack = useLaunchStore(state => state.sidebarViewStack);
-  const selectedLaunch = useLaunchStore(state => state.selectedLaunch);
-  const selectedPad = useLaunchStore(state => state.selectedPad);
-  const selectedRocket = useLaunchStore(state => state.selectedRocket);
-  const selectedAgency = useLaunchStore(state => state.selectedAgency);
-  const sidebarOpen = useLaunchStore(state => state.sidebarOpen);
+  const globeMode = useLaunchStore((state) => state.globeMode);
+  const sidebarViewStack = useLaunchStore((state) => state.sidebarViewStack);
+  const selectedLaunch = useLaunchStore((state) => state.selectedLaunch);
+  const selectedPad = useLaunchStore((state) => state.selectedPad);
+  const selectedRocket = useLaunchStore((state) => state.selectedRocket);
+  const selectedAgency = useLaunchStore((state) => state.selectedAgency);
+  const sidebarOpen = useLaunchStore((state) => state.sidebarOpen);
 
   const [sidebarWidth, setSidebarWidth] = useState(380);
   const [isResizing, setIsResizing] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
 
   const currentView = sidebarViewStack[sidebarViewStack.length - 1];
-  const showDetailView = currentView.type !== 'launch-list';
+  const showDetailView = currentView.type !== "launch-list";
 
   // Handle resize
   useEffect(() => {
@@ -42,13 +42,13 @@ export function Sidebar() {
     };
 
     if (isResizing) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
+      document.addEventListener("mousemove", handleMouseMove);
+      document.addEventListener("mouseup", handleMouseUp);
     }
 
     return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
     };
   }, [isResizing]);
 
@@ -58,25 +58,25 @@ export function Sidebar() {
     // Detail views have priority over tabs
     if (showDetailView) {
       switch (currentView.type) {
-        case 'launch-detail':
+        case "launch-detail":
           return selectedLaunch ? (
             <LaunchDetailView launch={selectedLaunch} />
           ) : (
             <LaunchTab />
           );
-        case 'pad-detail':
+        case "pad-detail":
           return selectedPad ? (
             <PadDetailView pad={selectedPad} />
           ) : (
             <PadsTab />
           );
-        case 'rocket-detail':
+        case "rocket-detail":
           return selectedRocket ? (
             <RocketDetailView rocket={selectedRocket} />
           ) : (
             <RocketsTab />
           );
-        case 'agency-detail':
+        case "agency-detail":
           return selectedAgency ? (
             <AgencyDetailView agency={selectedAgency} />
           ) : (
@@ -89,13 +89,13 @@ export function Sidebar() {
 
     // Base mode: follow globeMode set from header
     switch (globeMode) {
-      case 'launches':
+      case "launches":
         return <LaunchTab />;
-      case 'pads':
+      case "pads":
         return <PadsTab />;
-      case 'rockets':
+      case "rockets":
         return <RocketsTab />;
-      case 'agencies':
+      case "agencies":
         return <AgenciesTab />;
       default:
         return <LaunchTab />;

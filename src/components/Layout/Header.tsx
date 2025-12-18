@@ -1,19 +1,23 @@
 // src/components/Layout/Header.tsx
-import { useLaunchStore } from '../../store/launchStore';
-import { isUpcomingLaunch, isDecidedLaunch, isPreviousLaunch } from '../../store/launchStore';
-import './Header.css';
+import { useLaunchStore } from "../../store/launchStore";
+import {
+  isUpcomingLaunch,
+  isDecidedLaunch,
+  isPreviousLaunch,
+} from "../../store/launchStore";
+import "./Header.css";
 
 export function Header() {
-  const globeMode = useLaunchStore(state => state.globeMode);
-  const setGlobeMode = useLaunchStore(state => state.setGlobeMode);
-  const launches = useLaunchStore(state => state.launches);
-  const pads = useLaunchStore(state => state.pads);
-  const rockets = useLaunchStore(state => state.rockets);
-  const agencies = useLaunchStore(state => state.agencies);
-  const sidebarOpen = useLaunchStore(state => state.sidebarOpen);
-  const toggleSidebar = useLaunchStore(state => state.toggleSidebar);
-  const fetchAllData = useLaunchStore(state => state.fetchAllData);
-  const isLoading = useLaunchStore(state => state.isLoading);
+  const globeMode = useLaunchStore((state) => state.globeMode);
+  const setGlobeMode = useLaunchStore((state) => state.setGlobeMode);
+  const launches = useLaunchStore((state) => state.launches);
+  const pads = useLaunchStore((state) => state.pads);
+  const rockets = useLaunchStore((state) => state.rockets);
+  const agencies = useLaunchStore((state) => state.agencies);
+  const sidebarOpen = useLaunchStore((state) => state.sidebarOpen);
+  const toggleSidebar = useLaunchStore((state) => state.toggleSidebar);
+  const fetchAllData = useLaunchStore((state) => state.fetchAllData);
+  const isLoading = useLaunchStore((state) => state.isLoading);
 
   // Calculate stats
   const upcomingCount = launches.filter(isUpcomingLaunch).length;
@@ -29,12 +33,20 @@ export function Header() {
       <div className="header-content">
         {/* Left Section */}
         <div className="header-left">
-          <button 
-            className="sidebar-toggle-btn" 
+          <button
+            className="sidebar-toggle-btn"
             onClick={toggleSidebar}
             aria-label={sidebarOpen ? "Close sidebar" : "Open sidebar"}
           >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            >
               {sidebarOpen ? (
                 <>
                   <path d="M18 6L6 18" />
@@ -52,14 +64,23 @@ export function Header() {
 
           <div className="logo">
             <div className="logo-icon">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
-                <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
-                <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0"/>
-                <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5"/>
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+                <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
+                <path d="M9 12H4s.55-3.03 2-4c1.62-1.08 5 0 5 0" />
+                <path d="M12 15v5s3.03-.55 4-2c1.08-1.62 0-5 0-5" />
               </svg>
             </div>
-            
+
             <div className="logo-text-group">
               <h1 className="logo-text">ROCKETGLOBE</h1>
               <span className="logo-subtitle">Launch Tracker</span>
@@ -70,45 +91,77 @@ export function Header() {
         {/* Center Section - Navigation */}
         <nav className="header-nav">
           <button
-            className={`nav-btn ${globeMode === 'launches' ? 'active' : ''}`}
-            onClick={() => setGlobeMode('launches')}
+            className={`nav-btn ${globeMode === "launches" ? "active" : ""}`}
+            onClick={() => setGlobeMode("launches")}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z"/>
-              <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"/>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <path d="M4.5 16.5c-1.5 1.26-2 5-2 5s3.74-.5 5-2c.71-.84.7-2.13-.09-2.91a2.18 2.18 0 0 0-2.91-.09z" />
+              <path d="m12 15-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 22 2c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z" />
             </svg>
             <span>Launches</span>
           </button>
-          
+
           <button
-            className={`nav-btn ${globeMode === 'pads' ? 'active' : ''}`}
-            onClick={() => setGlobeMode('pads')}
+            className={`nav-btn ${globeMode === "pads" ? "active" : ""}`}
+            onClick={() => setGlobeMode("pads")}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <circle cx="12" cy="12" r="10"/>
-              <circle cx="12" cy="12" r="6"/>
-              <circle cx="12" cy="12" r="2"/>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <circle cx="12" cy="12" r="6" />
+              <circle cx="12" cy="12" r="2" />
             </svg>
             <span>Pads</span>
           </button>
-          
+
           <button
-            className={`nav-btn ${globeMode === 'rockets' ? 'active' : ''}`}
-            onClick={() => setGlobeMode('rockets')}
+            className={`nav-btn ${globeMode === "rockets" ? "active" : ""}`}
+            onClick={() => setGlobeMode("rockets")}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M21 3l-6 18-3-9-9-3 18-6z"/>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <path d="M21 3l-6 18-3-9-9-3 18-6z" />
             </svg>
             <span>Rockets</span>
           </button>
-          
+
           <button
-            className={`nav-btn ${globeMode === 'agencies' ? 'active' : ''}`}
-            onClick={() => setGlobeMode('agencies')}
+            className={`nav-btn ${globeMode === "agencies" ? "active" : ""}`}
+            onClick={() => setGlobeMode("agencies")}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-              <polyline points="9 22 9 12 15 12 15 22"/>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+              <polyline points="9 22 9 12 15 12 15 22" />
             </svg>
             <span>Agencies</span>
           </button>
@@ -117,7 +170,7 @@ export function Header() {
         {/* Right Section - Stats & Actions */}
         <div className="header-right">
           <div className="header-stats">
-            {globeMode === 'launches' && (
+            {globeMode === "launches" && (
               <>
                 <div className="stat-card stat-upcoming">
                   <div className="stat-value">{upcomingCount}</div>
@@ -135,22 +188,22 @@ export function Header() {
                 </div>
               </>
             )}
-            
-            {globeMode === 'pads' && (
+
+            {globeMode === "pads" && (
               <div className="stat-card">
                 <div className="stat-value">{pads.length}</div>
                 <div className="stat-label">Launch Pads</div>
               </div>
             )}
-            
-            {globeMode === 'rockets' && (
+
+            {globeMode === "rockets" && (
               <div className="stat-card">
                 <div className="stat-value">{rockets.length}</div>
                 <div className="stat-label">Rocket Types</div>
               </div>
             )}
-            
-            {globeMode === 'agencies' && (
+
+            {globeMode === "agencies" && (
               <div className="stat-card">
                 <div className="stat-value">{agencies.length}</div>
                 <div className="stat-label">Space Agencies</div>
@@ -158,16 +211,24 @@ export function Header() {
             )}
           </div>
 
-          <button 
-            className={`refresh-btn ${isLoading ? 'loading' : ''}`}
+          <button
+            className={`refresh-btn ${isLoading ? "loading" : ""}`}
             onClick={handleRefresh}
             disabled={isLoading}
             aria-label="Refresh data"
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-              <polyline points="23 4 23 10 17 10"/>
-              <polyline points="1 20 1 14 7 14"/>
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            >
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
             </svg>
           </button>
         </div>

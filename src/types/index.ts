@@ -58,12 +58,12 @@ export interface Rocket {
 // VIEW TYPES
 // ============================================================================
 
-export type ViewType = 
-  | 'launch-list' 
-  | 'launch-detail' 
-  | 'pad-detail' 
-  | 'rocket-detail' 
-  | 'agency-detail';
+export type ViewType =
+  | "launch-list"
+  | "launch-detail"
+  | "pad-detail"
+  | "rocket-detail"
+  | "agency-detail";
 
 export interface View {
   type: ViewType;

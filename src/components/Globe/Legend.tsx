@@ -1,58 +1,85 @@
 // src/components/Globe/Legend.tsx
-import './Legend.css';
+import "./Legend.css";
 
 interface LegendProps {
-  mode: 'pads' | 'heatmap' | 'trajectories' | 'timeline' | 'agencies';
+  mode: "pads" | "heatmap" | "trajectories" | "timeline" | "agencies";
 }
 
 export function Legend({ mode }: LegendProps) {
-  if (mode === 'heatmap' || mode === 'agencies') return null;
+  if (mode === "heatmap" || mode === "agencies") return null;
 
   return (
     <div className="globe-legend">
       <div className="legend-title">
-        {mode === 'trajectories' ? 'Launch Status' : 'Launch Activity'}
+        {mode === "trajectories" ? "Launch Status" : "Launch Activity"}
       </div>
       <div className="legend-items">
-        {mode === 'trajectories' ? (
+        {mode === "trajectories" ? (
           <>
             <div className="legend-item">
-              <div className="legend-color" style={{ background: '#00ff00' }}></div>
+              <div
+                className="legend-color"
+                style={{ background: "#00ff00" }}
+              ></div>
               <span>Success</span>
             </div>
             <div className="legend-item">
-              <div className="legend-color" style={{ background: '#ffff00' }}></div>
+              <div
+                className="legend-color"
+                style={{ background: "#ffff00" }}
+              ></div>
               <span>Partial</span>
             </div>
             <div className="legend-item">
-              <div className="legend-color" style={{ background: '#ff0000' }}></div>
+              <div
+                className="legend-color"
+                style={{ background: "#ff0000" }}
+              ></div>
               <span>Failure</span>
             </div>
             <div className="legend-item">
-              <div className="legend-color" style={{ background: '#00ffff' }}></div>
+              <div
+                className="legend-color"
+                style={{ background: "#00ffff" }}
+              ></div>
               <span>Unknown</span>
             </div>
           </>
         ) : (
           <>
             <div className="legend-item">
-              <div className="legend-color" style={{ background: '#00ff00' }}></div>
+              <div
+                className="legend-color"
+                style={{ background: "#00ff00" }}
+              ></div>
               <span>100+ launches</span>
             </div>
             <div className="legend-item">
-              <div className="legend-color" style={{ background: '#ffff00' }}></div>
+              <div
+                className="legend-color"
+                style={{ background: "#ffff00" }}
+              ></div>
               <span>50-100 launches</span>
             </div>
             <div className="legend-item">
-              <div className="legend-color" style={{ background: '#ffa500' }}></div>
+              <div
+                className="legend-color"
+                style={{ background: "#ffa500" }}
+              ></div>
               <span>20-50 launches</span>
             </div>
             <div className="legend-item">
-              <div className="legend-color" style={{ background: '#00ffff' }}></div>
+              <div
+                className="legend-color"
+                style={{ background: "#00ffff" }}
+              ></div>
               <span>1-20 launches</span>
             </div>
             <div className="legend-item">
-              <div className="legend-color" style={{ background: '#808080' }}></div>
+              <div
+                className="legend-color"
+                style={{ background: "#808080" }}
+              ></div>
               <span>No launches</span>
             </div>
           </>

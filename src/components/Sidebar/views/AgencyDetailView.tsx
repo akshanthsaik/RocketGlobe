@@ -1,49 +1,60 @@
 // src/components/Sidebar/views/AgencyDetailView.tsx
-import { useMemo } from 'react';
-import { useLaunchStore } from '../../../store/launchStore';
-import { Agency } from '../../../lib/api';
-import { getCountryFlag } from '../../../lib/utils';
-import { LaunchCard } from '../cards/LaunchCard';
-import './AgencyDetailView.css';
+import { useMemo } from "react";
+import { useLaunchStore } from "../../../store/launchStore";
+import { Agency } from "../../../lib/api";
+import { getCountryFlag } from "../../../lib/utils";
+import { LaunchCard } from "../cards/LaunchCard";
+import "./AgencyDetailView.css";
 
 interface AgencyDetailViewProps {
   agency: Agency;
 }
 
 export function AgencyDetailView({ agency }: AgencyDetailViewProps) {
-  const popSidebarView = useLaunchStore(state => state.popSidebarView);
-  const selectLaunch = useLaunchStore(state => state.selectLaunch);
-  const rockets = useLaunchStore(state => state.rockets);
-  const allLaunches = useLaunchStore(state => state.launches);
-  
+  const popSidebarView = useLaunchStore((state) => state.popSidebarView);
+  const selectLaunch = useLaunchStore((state) => state.selectLaunch);
+  const rockets = useLaunchStore((state) => state.rockets);
+  const allLaunches = useLaunchStore((state) => state.launches);
+
   // Use useMemo to prevent infinite loop
   const launches = useMemo(() => {
     return allLaunches
-      .filter(l => l.agency_id === agency.id)
-      .sort((a, b) => new Date(b.net || 0).getTime() - new Date(a.net || 0).getTime());
+      .filter((l) => l.agency_id === agency.id)
+      .sort(
+        (a, b) =>
+          new Date(b.net || 0).getTime() - new Date(a.net || 0).getTime(),
+      );
   }, [allLaunches, agency.id]);
 
-  const agencyRockets = rockets.filter(r => r.manufacturer_id === agency.id);
-  const agencyPads = [...new Set(launches.map(l => l.pad_id))].filter(Boolean);
-  
-  const now = new Date();
-  const upcomingLaunches = useMemo(() => 
-    launches.filter(l => l.net && new Date(l.net) > now),
-    [launches]
-  );
-  
-  const pastLaunches = useMemo(() => 
-    launches.filter(l => l.net && new Date(l.net) <= now),
-    [launches]
+  const agencyRockets = rockets.filter((r) => r.manufacturer_id === agency.id);
+  const agencyPads = [...new Set(launches.map((l) => l.pad_id))].filter(
+    Boolean,
   );
 
+  const now = new Date();
+  const upcomingLaunches = useMemo(
+    () => launches.filter((l) => l.net && new Date(l.net) > now),
+    [launches],
+  );
+
+  const pastLaunches = useMemo(
+    () => launches.filter((l) => l.net && new Date(l.net) <= now),
+    [launches],
+  );
 
   return (
     <div className="agency-detail-view">
       <div className="view-header">
         <button className="back-btn" onClick={popSidebarView}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
         </button>
         <h2 className="view-title">Agency</h2>
@@ -94,7 +105,9 @@ export function AgencyDetailView({ agency }: AgencyDetailViewProps) {
           )}
           <div className="detail-row">
             <span className="detail-key">Status:</span>
-            <span className="detail-value">{agency.is_active ? 'Active' : 'Inactive'}</span>
+            <span className="detail-value">
+              {agency.is_active ? "Active" : "Inactive"}
+            </span>
           </div>
         </div>
 
@@ -130,7 +143,7 @@ export function AgencyDetailView({ agency }: AgencyDetailViewProps) {
               <span className="section-count">{upcomingLaunches.length}</span>
             </div>
             <div className="launch-list">
-              {upcomingLaunches.slice(0, 10).map(launch => (
+              {upcomingLaunches.slice(0, 10).map((launch) => (
                 <LaunchCard
                   key={launch.id}
                   launch={launch}
@@ -149,7 +162,7 @@ export function AgencyDetailView({ agency }: AgencyDetailViewProps) {
               <span className="section-count">{pastLaunches.length}</span>
             </div>
             <div className="launch-list">
-              {pastLaunches.slice(0, 10).map(launch => (
+              {pastLaunches.slice(0, 10).map((launch) => (
                 <LaunchCard
                   key={launch.id}
                   launch={launch}

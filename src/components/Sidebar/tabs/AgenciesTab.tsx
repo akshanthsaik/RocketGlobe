@@ -1,43 +1,48 @@
 // src/components/Sidebar/tabs/AgenciesTab.tsx
-import { useMemo, useState } from 'react';
-import { useLaunchStore } from '../../../store/launchStore';
-import { getCountryFlag } from '../../../lib/utils';
-import './AgenciesTab.css';
+import { useMemo, useState } from "react";
+import { useLaunchStore } from "../../../store/launchStore";
+import { getCountryFlag } from "../../../lib/utils";
+import "./AgenciesTab.css";
 
 export function AgenciesTab() {
-  const agencies = useLaunchStore(state => state.agencies);
-  const launches = useLaunchStore(state => state.launches);
-  const navigateToAgency = useLaunchStore(state => state.navigateToAgency);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'name' | 'launches'>('launches');
-  const [filterType, setFilterType] = useState<'all' | 'government' | 'commercial'>('all');
+  const agencies = useLaunchStore((state) => state.agencies);
+  const launches = useLaunchStore((state) => state.launches);
+  const navigateToAgency = useLaunchStore((state) => state.navigateToAgency);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"name" | "launches">("launches");
+  const [filterType, setFilterType] = useState<
+    "all" | "government" | "commercial"
+  >("all");
 
   const sortedAgencies = useMemo(() => {
-    let filtered = agencies.filter(agency => 
-      agency.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      agency.abbrev?.toLowerCase().includes(searchQuery.toLowerCase())
+    let filtered = agencies.filter(
+      (agency) =>
+        agency.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        agency.abbrev?.toLowerCase().includes(searchQuery.toLowerCase()),
     );
 
     // Filter by type
-    if (filterType === 'government') {
-      filtered = filtered.filter(a => 
-        a.type?.toLowerCase().includes('government') || 
-        a.type?.toLowerCase().includes('state')
+    if (filterType === "government") {
+      filtered = filtered.filter(
+        (a) =>
+          a.type?.toLowerCase().includes("government") ||
+          a.type?.toLowerCase().includes("state"),
       );
-    } else if (filterType === 'commercial') {
-      filtered = filtered.filter(a => 
-        a.type?.toLowerCase().includes('commercial') || 
-        a.type?.toLowerCase().includes('private')
+    } else if (filterType === "commercial") {
+      filtered = filtered.filter(
+        (a) =>
+          a.type?.toLowerCase().includes("commercial") ||
+          a.type?.toLowerCase().includes("private"),
       );
     }
 
-    const agenciesWithCounts = filtered.map(agency => ({
+    const agenciesWithCounts = filtered.map((agency) => ({
       ...agency,
-      launchCount: launches.filter(l => l.agency_id === agency.id).length,
+      launchCount: launches.filter((l) => l.agency_id === agency.id).length,
     }));
 
     return agenciesWithCounts.sort((a, b) => {
-      if (sortBy === 'launches') {
+      if (sortBy === "launches") {
         return b.launchCount - a.launchCount;
       }
       return a.name.localeCompare(b.name);
@@ -54,23 +59,23 @@ export function AgenciesTab() {
           onChange={(e) => setSearchQuery(e.target.value)}
           className="search-input"
         />
-        
+
         <div className="filter-chips">
           <button
-            className={`filter-chip ${filterType === 'all' ? 'active' : ''}`}
-            onClick={() => setFilterType('all')}
+            className={`filter-chip ${filterType === "all" ? "active" : ""}`}
+            onClick={() => setFilterType("all")}
           >
             All
           </button>
           <button
-            className={`filter-chip ${filterType === 'government' ? 'active' : ''}`}
-            onClick={() => setFilterType('government')}
+            className={`filter-chip ${filterType === "government" ? "active" : ""}`}
+            onClick={() => setFilterType("government")}
           >
             Government
           </button>
           <button
-            className={`filter-chip ${filterType === 'commercial' ? 'active' : ''}`}
-            onClick={() => setFilterType('commercial')}
+            className={`filter-chip ${filterType === "commercial" ? "active" : ""}`}
+            onClick={() => setFilterType("commercial")}
           >
             Commercial
           </button>
@@ -78,14 +83,14 @@ export function AgenciesTab() {
 
         <div className="sort-buttons">
           <button
-            className={`sort-btn ${sortBy === 'launches' ? 'active' : ''}`}
-            onClick={() => setSortBy('launches')}
+            className={`sort-btn ${sortBy === "launches" ? "active" : ""}`}
+            onClick={() => setSortBy("launches")}
           >
             By Launches
           </button>
           <button
-            className={`sort-btn ${sortBy === 'name' ? 'active' : ''}`}
-            onClick={() => setSortBy('name')}
+            className={`sort-btn ${sortBy === "name" ? "active" : ""}`}
+            onClick={() => setSortBy("name")}
           >
             By Name
           </button>
@@ -93,10 +98,8 @@ export function AgenciesTab() {
       </div>
 
       <div className="agencies-list">
-        <div className="list-count">
-          {sortedAgencies.length} agencies
-        </div>
-        {sortedAgencies.map(agency => (
+        <div className="list-count">{sortedAgencies.length} agencies</div>
+        {sortedAgencies.map((agency) => (
           <div
             key={agency.id}
             className="agency-item"
@@ -107,7 +110,8 @@ export function AgenciesTab() {
                 <img src={agency.logo_url} alt={agency.name} />
               ) : (
                 <div className="agency-placeholder">
-                  {agency.abbrev?.substring(0, 2) || agency.name.substring(0, 2)}
+                  {agency.abbrev?.substring(0, 2) ||
+                    agency.name.substring(0, 2)}
                 </div>
               )}
             </div>

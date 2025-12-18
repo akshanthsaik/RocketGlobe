@@ -16,6 +16,7 @@
     "@tauri-apps/plugin-opener": "^2",
     "cesium": "^1.136.0",
     "framer-motion": "^12.23.25",
+    "prettier": "^3.7.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "resium": "^1.19.2",

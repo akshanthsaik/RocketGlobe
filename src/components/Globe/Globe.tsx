@@ -1,18 +1,18 @@
 // src/components/Globe/Globe.tsx
-import { useEffect, useRef, useState, useMemo } from 'react';
-import * as Cesium from 'cesium';
+import { useEffect, useRef, useState, useMemo } from "react";
+import * as Cesium from "cesium";
 import {
   useLaunchStore,
   getActiveLaunches,
   getLaunchesForRocket,
   getLaunchesForAgency,
   getTimelineLaunchesForGlobe,
-} from '../../store/launchStore';
-import './Globe.css';
-import { Legend } from './Legend';
+} from "../../store/launchStore";
+import "./Globe.css";
+import { Legend } from "./Legend";
 
 Cesium.Ion.defaultAccessToken =
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI5ZTAwNzk4ZS0zYzUwLTQzMzItYmYzNi1iOWIyZjU1ODg3ZmEiLCJpZCI6MzY3ODk4LCJpYXQiOjE3NjUyNjA2OTl9.NKrR0XhbDD_R8dyteyC6srb_Bxi4BHEMOib7O5CHa0s';
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI5ZTAwNzk4ZS0zYzUwLTQzMzItYmYzNi1iOWIyZjU1ODg3ZmEiLCJpZCI6MzY3ODk4LCJpYXQiOjE3NjUyNjA2OTl9.NKrR0XhbDD_R8dyteyC6srb_Bxi4BHEMOib7O5CHa0s";
 
 export function Globe() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -23,77 +23,76 @@ export function Globe() {
   const [viewerReady, setViewerReady] = useState(false);
 
   // Store slices
-  const pads = useLaunchStore(state => state.pads);
-  const launches = useLaunchStore(state => state.launches);
-  const agencies = useLaunchStore(state => state.agencies);
-  const rockets = useLaunchStore(state => state.rockets);
+  const pads = useLaunchStore((state) => state.pads);
+  const launches = useLaunchStore((state) => state.launches);
+  const agencies = useLaunchStore((state) => state.agencies);
+  const rockets = useLaunchStore((state) => state.rockets);
 
-  const selectedLaunch = useLaunchStore(state => state.selectedLaunch);
-  const selectedRocket = useLaunchStore(state => state.selectedRocket);
-  const selectedAgency = useLaunchStore(state => state.selectedAgency);
+  const selectedLaunch = useLaunchStore((state) => state.selectedLaunch);
+  const selectedRocket = useLaunchStore((state) => state.selectedRocket);
+  const selectedAgency = useLaunchStore((state) => state.selectedAgency);
 
-  const timelineDate = useLaunchStore(state => state.timelineDate);
-  const timelineEnabled = useLaunchStore(s => s.timelineEnabled);
-  const isTimelinePlaying = useLaunchStore(state => state.isTimelinePlaying);
+  const timelineDate = useLaunchStore((state) => state.timelineDate);
+  const timelineEnabled = useLaunchStore((s) => s.timelineEnabled);
+  const isTimelinePlaying = useLaunchStore((state) => state.isTimelinePlaying);
 
-  const globeMode = useLaunchStore(state => state.globeMode);
-  const isLoading = useLaunchStore(state => state.isLoading);
-  const sidebarOpen = useLaunchStore(state => state.sidebarOpen);
+  const globeMode = useLaunchStore((state) => state.globeMode);
+  const isLoading = useLaunchStore((state) => state.isLoading);
+  const sidebarOpen = useLaunchStore((state) => state.sidebarOpen);
 
-  const launchTab = useLaunchStore(s => s.launchTab);
-  const searchQuery = useLaunchStore(s => s.searchQuery);
-  const statusFilter = useLaunchStore(s => s.statusFilter);
-  const agencyFilter = useLaunchStore(s => s.agencyFilter);
-  const rocketFilter = useLaunchStore(s => s.rocketFilter);
+  const launchTab = useLaunchStore((s) => s.launchTab);
+  const searchQuery = useLaunchStore((s) => s.searchQuery);
+  const statusFilter = useLaunchStore((s) => s.statusFilter);
+  const agencyFilter = useLaunchStore((s) => s.agencyFilter);
+  const rocketFilter = useLaunchStore((s) => s.rocketFilter);
 
   // Pads to render for each mode
-const padsToShow = useMemo(() => {
-  const state = useLaunchStore.getState();
+  const padsToShow = useMemo(() => {
+    const state = useLaunchStore.getState();
 
-  if (globeMode === 'launches') {
-    const launchesForPads = timelineEnabled
-      ? getTimelineLaunchesForGlobe(state)
-      : getActiveLaunches(state);
+    if (globeMode === "launches") {
+      const launchesForPads = timelineEnabled
+        ? getTimelineLaunchesForGlobe(state)
+        : getActiveLaunches(state);
 
-    const padIds = new Set(
-      launchesForPads.map(l => l.pad_id).filter((id): id is number => !!id),
-    );
-    return pads.filter(p => padIds.has(p.id));
-  }
+      const padIds = new Set(
+        launchesForPads.map((l) => l.pad_id).filter((id): id is number => !!id),
+      );
+      return pads.filter((p) => padIds.has(p.id));
+    }
 
-  if (globeMode === 'pads') return pads;
+    if (globeMode === "pads") return pads;
 
-  if (globeMode === 'rockets' && selectedRocket) {
-    const rocketLaunches = getLaunchesForRocket(launches, selectedRocket.id);
-    const padIds = new Set(
-      rocketLaunches.map(l => l.pad_id).filter((id): id is number => !!id),
-    );
-    return pads.filter(p => padIds.has(p.id));
-  }
+    if (globeMode === "rockets" && selectedRocket) {
+      const rocketLaunches = getLaunchesForRocket(launches, selectedRocket.id);
+      const padIds = new Set(
+        rocketLaunches.map((l) => l.pad_id).filter((id): id is number => !!id),
+      );
+      return pads.filter((p) => padIds.has(p.id));
+    }
 
-  if (globeMode === 'agencies' && selectedAgency) {
-    const agencyLaunches = getLaunchesForAgency(launches, selectedAgency.id);
-    const padIds = new Set(
-      agencyLaunches.map(l => l.pad_id).filter((id): id is number => !!id),
-    );
-    return pads.filter(p => padIds.has(p.id));
-  }
+    if (globeMode === "agencies" && selectedAgency) {
+      const agencyLaunches = getLaunchesForAgency(launches, selectedAgency.id);
+      const padIds = new Set(
+        agencyLaunches.map((l) => l.pad_id).filter((id): id is number => !!id),
+      );
+      return pads.filter((p) => padIds.has(p.id));
+    }
 
-  return [] as typeof pads;
-}, [
-  globeMode,
-  pads,
-  launches,
-  selectedRocket,
-  selectedAgency,
-  timelineEnabled,
-  launchTab,
-  searchQuery,
-  statusFilter,
-  agencyFilter,
-  rocketFilter,
-]);
-
+    return [] as typeof pads;
+  }, [
+    globeMode,
+    pads,
+    launches,
+    selectedRocket,
+    selectedAgency,
+    timelineEnabled,
+    launchTab,
+    searchQuery,
+    statusFilter,
+    agencyFilter,
+    rocketFilter,
+  ]);
 
   // Container ready
   useEffect(() => {
@@ -123,7 +122,7 @@ const padsToShow = useMemo(() => {
 
     const initializeViewer = async () => {
       try {
-        if (!containerRef.current) throw new Error('Container lost');
+        if (!containerRef.current) throw new Error("Container lost");
 
         const terrainProvider = await Cesium.createWorldTerrainAsync();
 
@@ -156,50 +155,47 @@ const padsToShow = useMemo(() => {
 
         // Click handler
         handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
-        handler.setInputAction(
-          (movement: any) => {
-            const pickedObject = viewer!.scene.pick(movement.position);
-            if (Cesium.defined(pickedObject) && pickedObject.id) {
-              const entity = pickedObject.id;
-              const entityType = entity.properties?.type?.getValue();
+        handler.setInputAction((movement: any) => {
+          const pickedObject = viewer!.scene.pick(movement.position);
+          if (Cesium.defined(pickedObject) && pickedObject.id) {
+            const entity = pickedObject.id;
+            const entityType = entity.properties?.type?.getValue();
 
-              if (entityType === 'pad') {
-                const padId = entity.properties?.padId?.getValue();
-                if (padId) {
-                  useLaunchStore.getState().navigateToPad(padId);
+            if (entityType === "pad") {
+              const padId = entity.properties?.padId?.getValue();
+              if (padId) {
+                useLaunchStore.getState().navigateToPad(padId);
 
-                  const position = entity.position?.getValue(
-                    Cesium.JulianDate.now(),
-                  );
-                  if (position) {
-                    const cartographic =
-                      Cesium.Cartographic.fromCartesian(position);
-                    viewer!.camera.flyTo({
-                      destination: Cesium.Cartesian3.fromRadians(
-                        cartographic.longitude,
-                        cartographic.latitude,
-                        500000,
-                      ),
-                      duration: 2,
-                    });
-                  }
-                }
-              } else if (entityType === 'agency') {
-                const agencyId = entity.properties?.agencyId?.getValue();
-                if (agencyId) {
-                  useLaunchStore.getState().navigateToAgency(agencyId);
+                const position = entity.position?.getValue(
+                  Cesium.JulianDate.now(),
+                );
+                if (position) {
+                  const cartographic =
+                    Cesium.Cartographic.fromCartesian(position);
+                  viewer!.camera.flyTo({
+                    destination: Cesium.Cartesian3.fromRadians(
+                      cartographic.longitude,
+                      cartographic.latitude,
+                      500000,
+                    ),
+                    duration: 2,
+                  });
                 }
               }
+            } else if (entityType === "agency") {
+              const agencyId = entity.properties?.agencyId?.getValue();
+              if (agencyId) {
+                useLaunchStore.getState().navigateToAgency(agencyId);
+              }
             }
-          },
-          Cesium.ScreenSpaceEventType.LEFT_CLICK,
-        );
+          }
+        }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
 
         viewerRef.current = viewer;
         handlerRef.current = handler;
         setViewerReady(true);
       } catch (error) {
-        console.error('Failed to initialize Cesium viewer:', error);
+        console.error("Failed to initialize Cesium viewer:", error);
         setIsReady(false);
       }
     };
@@ -225,21 +221,23 @@ const padsToShow = useMemo(() => {
     const viewer = viewerRef.current;
     viewer.entities.removeAll();
 
-    if (globeMode === 'agencies') {
+    if (globeMode === "agencies") {
       renderAgencies(viewer, agencies);
       return;
     }
 
     const state = useLaunchStore.getState();
-    const launchesForPads = globeMode === 'launches'
-      ? (timelineEnabled ? getTimelineLaunchesForGlobe(state) : getActiveLaunches(state))
-      : launches; // rockets/pads/agencies modes
+    const launchesForPads =
+      globeMode === "launches"
+        ? timelineEnabled
+          ? getTimelineLaunchesForGlobe(state)
+          : getActiveLaunches(state)
+        : launches; // rockets/pads/agencies modes
 
     const effectiveTimelineDate =
-      globeMode === 'launches' && timelineEnabled ? timelineDate : null;
+      globeMode === "launches" && timelineEnabled ? timelineDate : null;
 
     renderPads(viewer, padsToShow, launchesForPads, effectiveTimelineDate);
-
   }, [
     viewerReady,
     globeMode,
@@ -258,7 +256,7 @@ const padsToShow = useMemo(() => {
       !timelineEnabled ||
       !isTimelinePlaying ||
       !timelineDate ||
-      globeMode !== 'launches'
+      globeMode !== "launches"
     ) {
       return;
     }
@@ -270,7 +268,7 @@ const padsToShow = useMemo(() => {
     const latest = timelineLaunches[timelineLaunches.length - 1];
     if (!latest.pad_id) return;
 
-    const pad = pads.find(p => p.id === latest.pad_id);
+    const pad = pads.find((p) => p.id === latest.pad_id);
     if (!pad) return;
 
     const viewer = viewerRef.current;
@@ -282,27 +280,21 @@ const padsToShow = useMemo(() => {
       ),
       duration: 1.5,
     });
-  }, [
-    timelineDate,
-    timelineEnabled,
-    isTimelinePlaying,
-    globeMode,
-    pads,
-  ]);
+  }, [timelineDate, timelineEnabled, isTimelinePlaying, globeMode, pads]);
 
   // Highlight selected launch (manual click)
   useEffect(() => {
     if (!viewerRef.current || !selectedLaunch) return;
 
     const viewer = viewerRef.current;
-    const pad = pads.find(p => p.id === selectedLaunch.pad_id);
+    const pad = pads.find((p) => p.id === selectedLaunch.pad_id);
     if (!pad) return;
 
-    const oldHighlight = viewer.entities.getById('highlight');
+    const oldHighlight = viewer.entities.getById("highlight");
     if (oldHighlight) viewer.entities.remove(oldHighlight);
 
     viewer.entities.add({
-      id: 'highlight',
+      id: "highlight",
       position: Cesium.Cartesian3.fromDegrees(pad.longitude, pad.latitude),
       point: {
         pixelSize: 25,
@@ -323,16 +315,14 @@ const padsToShow = useMemo(() => {
 
     return () => {
       if (viewer && !viewer.isDestroyed()) {
-        const highlight = viewer.entities.getById('highlight');
+        const highlight = viewer.entities.getById("highlight");
         if (highlight) viewer.entities.remove(highlight);
       }
     };
   }, [selectedLaunch, pads]);
 
   return (
-    <div
-      className={`globe-container ${!sidebarOpen ? 'sidebar-closed' : ''}`}
-    >
+    <div className={`globe-container ${!sidebarOpen ? "sidebar-closed" : ""}`}>
       <div ref={containerRef} className="cesium-viewer" />
       <Legend mode={globeMode} />
       {!viewerReady && (
@@ -353,13 +343,11 @@ function renderPads(
   launches: any[],
   timelineDate: Date | null,
 ) {
-  pads.forEach(pad => {
+  pads.forEach((pad) => {
     const padLaunches = launches.filter((l: any) => l.pad_id === pad.id);
 
     const filteredLaunches = timelineDate
-      ? padLaunches.filter(
-          (l: any) => l.net && new Date(l.net) <= timelineDate,
-        )
+      ? padLaunches.filter((l: any) => l.net && new Date(l.net) <= timelineDate)
       : padLaunches;
 
     const launchCount = filteredLaunches.length;
@@ -381,7 +369,7 @@ function renderPads(
         outlineWidth: 2,
       },
       properties: {
-        type: 'pad',
+        type: "pad",
         padId: pad.id,
         padName: pad.name,
         launchCount,
@@ -405,13 +393,13 @@ function renderAgencies(viewer: Cesium.Viewer, agencies: any[]) {
       ),
       point: {
         pixelSize: 16,
-        color: Cesium.Color.fromCssColorString('#3b82f6'),
+        color: Cesium.Color.fromCssColorString("#3b82f6"),
         outlineColor: Cesium.Color.WHITE,
         outlineWidth: 3,
       },
       label: {
         text: agency.abbrev || agency.name,
-        font: '14px sans-serif',
+        font: "14px sans-serif",
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 3,
@@ -421,7 +409,7 @@ function renderAgencies(viewer: Cesium.Viewer, agencies: any[]) {
         scale: 0.9,
       },
       properties: {
-        type: 'agency',
+        type: "agency",
         agencyId: agency.id,
         agencyName: agency.name,
       },

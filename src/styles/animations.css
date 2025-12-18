@@ -151,7 +151,8 @@
 
 /* ===== PULSE ANIMATION ===== */
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
@@ -186,7 +187,8 @@
 
 /* ===== BOUNCE ANIMATION ===== */
 @keyframes bounce {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateY(0);
   }
   50% {
@@ -200,7 +202,8 @@
 
 /* ===== GLOW ANIMATION ===== */
 @keyframes glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 5px var(--accent-blue);
   }
   50% {
@@ -242,7 +245,8 @@
 
 /* ===== HEARTBEAT ANIMATION ===== */
 @keyframes heartbeat {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   25% {
@@ -270,7 +274,9 @@
 }
 
 .transition-colors {
-  transition: background-color var(--transition-base), color var(--transition-base);
+  transition:
+    background-color var(--transition-base),
+    color var(--transition-base);
 }
 
 /* ===== HOVER EFFECTS ===== */

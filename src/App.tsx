@@ -1,21 +1,21 @@
 // src/App.tsx
-import { useEffect } from 'react';
-import { useLaunchStore } from './store/launchStore';
-import { Header } from './components/Layout/Header';
-import { Sidebar } from './components/Sidebar/Sidebar';
-import { Globe } from './components/Globe/Globe';
-import { Timeline } from './components/Timeline/Timeline';
-import './App.css';
+import { useEffect } from "react";
+import { useLaunchStore } from "./store/launchStore";
+import { Header } from "./components/Layout/Header";
+import { Sidebar } from "./components/Sidebar/Sidebar";
+import { Globe } from "./components/Globe/Globe";
+import { Timeline } from "./components/Timeline/Timeline";
+import "./App.css";
 
 function App() {
-  const fetchAllData = useLaunchStore(state => state.fetchAllData);
-  const isLoading = useLaunchStore(state => state.isLoading);
-  const error = useLaunchStore(state => state.error);
-  const globeMode = useLaunchStore(state => state.globeMode);
-  const timelineDate = useLaunchStore(state => state.timelineDate);
-  const isTimelinePlaying = useLaunchStore(state => state.isTimelinePlaying);
-  const timelineEnabled = useLaunchStore(state => state.timelineEnabled);
-  const showTimeline = globeMode === 'launches' && timelineEnabled;
+  const fetchAllData = useLaunchStore((state) => state.fetchAllData);
+  const isLoading = useLaunchStore((state) => state.isLoading);
+  const error = useLaunchStore((state) => state.error);
+  const globeMode = useLaunchStore((state) => state.globeMode);
+  const timelineDate = useLaunchStore((state) => state.timelineDate);
+  const isTimelinePlaying = useLaunchStore((state) => state.isTimelinePlaying);
+  const timelineEnabled = useLaunchStore((state) => state.timelineEnabled);
+  const showTimeline = globeMode === "launches" && timelineEnabled;
 
   useEffect(() => {
     fetchAllData();
@@ -34,7 +34,6 @@ function App() {
       </div>
     );
   }
-
 
   return (
     <div className="app">

@@ -1,4 +1,4 @@
-const API_BASE_URL = 'http://127.0.0.1:8000/api';
+const API_BASE_URL = "http://127.0.0.1:8000/api";
 
 // Types matching backend schemas EXACTLY
 export interface Agency {
@@ -68,9 +68,9 @@ export interface Launch {
 
 // Status classification
 export const LAUNCH_STATUS = {
-  UPCOMING: ['Go', 'TBD', 'TBC'],
-  DECIDED: ['Go for Launch'],
-  PREVIOUS: ['Success', 'Failure', 'Partial Failure'],
+  UPCOMING: ["Go", "TBD", "TBC"],
+  DECIDED: ["Go for Launch"],
+  PREVIOUS: ["Success", "Failure", "Partial Failure"],
 } as const;
 
 // API Client
@@ -85,17 +85,19 @@ class RocketGlobeAPI {
     try {
       const url = `${this.baseURL}${endpoint}`;
       console.log(`🌐 API Request: ${url}`);
-      
+
       const response = await fetch(url, {
-        method: 'GET',
+        method: "GET",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`API Error ${response.status}: ${errorText || response.statusText}`);
+        throw new Error(
+          `API Error ${response.status}: ${errorText || response.statusText}`,
+        );
       }
 
       const data = await response.json();
@@ -126,7 +128,7 @@ class RocketGlobeAPI {
         }
       });
     }
-    const endpoint = `/launches${query.toString() ? `?${query}` : ''}`;
+    const endpoint = `/launches${query.toString() ? `?${query}` : ""}`;
     return this.fetch<Launch[]>(endpoint);
   }
 
@@ -152,7 +154,7 @@ class RocketGlobeAPI {
         }
       });
     }
-    const endpoint = `/pads${query.toString() ? `?${query}` : ''}`;
+    const endpoint = `/pads${query.toString() ? `?${query}` : ""}`;
     return this.fetch<Pad[]>(endpoint);
   }
 
@@ -176,7 +178,7 @@ class RocketGlobeAPI {
         }
       });
     }
-    const endpoint = `/agencies${query.toString() ? `?${query}` : ''}`;
+    const endpoint = `/agencies${query.toString() ? `?${query}` : ""}`;
     return this.fetch<Agency[]>(endpoint);
   }
 
@@ -199,7 +201,7 @@ class RocketGlobeAPI {
         }
       });
     }
-    const endpoint = `/rockets${query.toString() ? `?${query}` : ''}`;
+    const endpoint = `/rockets${query.toString() ? `?${query}` : ""}`;
     return this.fetch<Rocket[]>(endpoint);
   }
 
@@ -209,7 +211,7 @@ class RocketGlobeAPI {
 
   // Health check
   async healthCheck(): Promise<{ status: string; message: string }> {
-    return this.fetch<{ status: string; message: string }>('/health');
+    return this.fetch<{ status: string; message: string }>("/health");
   }
 }
 

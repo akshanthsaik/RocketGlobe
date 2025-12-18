@@ -1,48 +1,57 @@
 // src/components/Sidebar/views/RocketDetailView.tsx
-import { useMemo } from 'react';
-import { useLaunchStore } from '../../../store/launchStore';
-import { Rocket } from '../../../lib/api';
-import { LaunchCard } from '../cards/LaunchCard';
-import './RocketDetailView.css';
+import { useMemo } from "react";
+import { useLaunchStore } from "../../../store/launchStore";
+import { Rocket } from "../../../lib/api";
+import { LaunchCard } from "../cards/LaunchCard";
+import "./RocketDetailView.css";
 
 interface RocketDetailViewProps {
   rocket: Rocket;
 }
 
 export function RocketDetailView({ rocket }: RocketDetailViewProps) {
-  const popSidebarView = useLaunchStore(state => state.popSidebarView);
-  const selectLaunch = useLaunchStore(state => state.selectLaunch);
-  const navigateToAgency = useLaunchStore(state => state.navigateToAgency);
-  const agencies = useLaunchStore(state => state.agencies);
-  const allLaunches = useLaunchStore(state => state.launches);
-  
+  const popSidebarView = useLaunchStore((state) => state.popSidebarView);
+  const selectLaunch = useLaunchStore((state) => state.selectLaunch);
+  const navigateToAgency = useLaunchStore((state) => state.navigateToAgency);
+  const agencies = useLaunchStore((state) => state.agencies);
+  const allLaunches = useLaunchStore((state) => state.launches);
+
   // Use useMemo to prevent infinite loop
   const launches = useMemo(() => {
     return allLaunches
-      .filter(l => l.rocket_id === rocket.id)
-      .sort((a, b) => new Date(b.net || 0).getTime() - new Date(a.net || 0).getTime());
+      .filter((l) => l.rocket_id === rocket.id)
+      .sort(
+        (a, b) =>
+          new Date(b.net || 0).getTime() - new Date(a.net || 0).getTime(),
+      );
   }, [allLaunches, rocket.id]);
 
-  const manufacturer = agencies.find(a => a.id === rocket.manufacturer_id);
-  
+  const manufacturer = agencies.find((a) => a.id === rocket.manufacturer_id);
+
   const now = new Date();
-  const upcomingLaunches = useMemo(() => 
-    launches.filter(l => l.net && new Date(l.net) > now),
-    [launches]
-  );
-  
-  const pastLaunches = useMemo(() => 
-    launches.filter(l => l.net && new Date(l.net) <= now),
-    [launches]
+  const upcomingLaunches = useMemo(
+    () => launches.filter((l) => l.net && new Date(l.net) > now),
+    [launches],
   );
 
+  const pastLaunches = useMemo(
+    () => launches.filter((l) => l.net && new Date(l.net) <= now),
+    [launches],
+  );
 
   return (
     <div className="rocket-detail-view">
       <div className="view-header">
         <button className="back-btn" onClick={popSidebarView}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M19 12H5M12 19l-7-7 7-7"/>
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+          >
+            <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
         </button>
         <h2 className="view-title">Rocket</h2>
@@ -53,8 +62,10 @@ export function RocketDetailView({ rocket }: RocketDetailViewProps) {
         <div className="rocket-header">
           <h3 className="rocket-name">{rocket.full_name || rocket.name}</h3>
           <div className="rocket-status">
-            <span className={`status-badge ${rocket.is_active ? 'active' : 'inactive'}`}>
-              {rocket.is_active ? 'Active' : 'Retired'}
+            <span
+              className={`status-badge ${rocket.is_active ? "active" : "inactive"}`}
+            >
+              {rocket.is_active ? "Active" : "Retired"}
             </span>
           </div>
         </div>
@@ -76,7 +87,9 @@ export function RocketDetailView({ rocket }: RocketDetailViewProps) {
           )}
           <div className="detail-row">
             <span className="detail-key">Status:</span>
-            <span className="detail-value">{rocket.is_active ? 'Active' : 'Retired'}</span>
+            <span className="detail-value">
+              {rocket.is_active ? "Active" : "Retired"}
+            </span>
           </div>
         </div>
 
@@ -90,15 +103,21 @@ export function RocketDetailView({ rocket }: RocketDetailViewProps) {
 
         {/* Manufacturer */}
         {manufacturer && (
-          <div 
-            className="info-card" 
+          <div
+            className="info-card"
             onClick={() => navigateToAgency(manufacturer.id)}
           >
             <div className="info-card-header">
               <div className="info-card-icon">
                 {manufacturer.logo_url ? (
-                  <img src={manufacturer.logo_url} alt={manufacturer.name} className="agency-logo" />
-                ) : '🏢'}
+                  <img
+                    src={manufacturer.logo_url}
+                    alt={manufacturer.name}
+                    className="agency-logo"
+                  />
+                ) : (
+                  "🏢"
+                )}
               </div>
               <div className="info-card-content">
                 <div className="info-card-label">Manufacturer</div>
@@ -133,7 +152,7 @@ export function RocketDetailView({ rocket }: RocketDetailViewProps) {
               <span className="section-count">{upcomingLaunches.length}</span>
             </div>
             <div className="launch-list">
-              {upcomingLaunches.slice(0, 10).map(launch => (
+              {upcomingLaunches.slice(0, 10).map((launch) => (
                 <LaunchCard
                   key={launch.id}
                   launch={launch}
@@ -152,7 +171,7 @@ export function RocketDetailView({ rocket }: RocketDetailViewProps) {
               <span className="section-count">{pastLaunches.length}</span>
             </div>
             <div className="launch-list">
-              {pastLaunches.slice(0, 10).map(launch => (
+              {pastLaunches.slice(0, 10).map((launch) => (
                 <LaunchCard
                   key={launch.id}
                   launch={launch}

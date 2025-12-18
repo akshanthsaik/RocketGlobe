@@ -1,28 +1,28 @@
 // src/components/Sidebar/tabs/LaunchTab.tsx
-import { useEffect, useState } from 'react';
+import { useEffect, useState } from "react";
 import {
   useLaunchStore,
   getActiveLaunches,
   LaunchTab as LaunchTabType,
-} from '../../../store/launchStore';
-import { LaunchCard } from '../cards/LaunchCard';
-import './LaunchTab.css';
+} from "../../../store/launchStore";
+import { LaunchCard } from "../cards/LaunchCard";
+import "./LaunchTab.css";
 
 export function LaunchTab() {
-  const state = useLaunchStore(s => s);
+  const state = useLaunchStore((s) => s);
   const launches = getActiveLaunches(state);
 
-  const selectLaunch = useLaunchStore(s => s.selectLaunch);
-  const pushSidebarView = useLaunchStore(s => s.pushSidebarView);
+  const selectLaunch = useLaunchStore((s) => s.selectLaunch);
+  const pushSidebarView = useLaunchStore((s) => s.pushSidebarView);
 
-  const launchTab = useLaunchStore(s => s.launchTab);
-  const setLaunchTab = useLaunchStore(s => s.setLaunchTab);
+  const launchTab = useLaunchStore((s) => s.launchTab);
+  const setLaunchTab = useLaunchStore((s) => s.setLaunchTab);
 
-  const searchQuery = useLaunchStore(s => s.searchQuery);
-  const setSearchQuery = useLaunchStore(s => s.setSearchQuery);
+  const searchQuery = useLaunchStore((s) => s.searchQuery);
+  const setSearchQuery = useLaunchStore((s) => s.setSearchQuery);
 
-  const timelineEnabled = useLaunchStore(s => s.timelineEnabled);
-  const setTimelineEnabled = useLaunchStore(s => s.setTimelineEnabled);
+  const timelineEnabled = useLaunchStore((s) => s.timelineEnabled);
+  const setTimelineEnabled = useLaunchStore((s) => s.setTimelineEnabled);
 
   const [localSearch, setLocalSearch] = useState(searchQuery);
 
@@ -31,10 +31,10 @@ export function LaunchTab() {
   }, [searchQuery]);
 
   const handleLaunchClick = (launchId: number) => {
-    const launch = launches.find(l => l.id === launchId);
+    const launch = launches.find((l) => l.id === launchId);
     if (launch) {
       selectLaunch(launch);
-      pushSidebarView({ type: 'launch-detail', data: launch });
+      pushSidebarView({ type: "launch-detail", data: launch });
     }
   };
 
@@ -60,20 +60,20 @@ export function LaunchTab() {
 
         <div className="filter-chips">
           <button
-            className={`filter-chip ${launchTab === 'upcoming' ? 'active' : ''}`}
-            onClick={() => setTab('upcoming')}
+            className={`filter-chip ${launchTab === "upcoming" ? "active" : ""}`}
+            onClick={() => setTab("upcoming")}
           >
             Upcoming
           </button>
           <button
-            className={`filter-chip ${launchTab === 'decided' ? 'active' : ''}`}
-            onClick={() => setTab('decided')}
+            className={`filter-chip ${launchTab === "decided" ? "active" : ""}`}
+            onClick={() => setTab("decided")}
           >
             Decided
           </button>
           <button
-            className={`filter-chip ${launchTab === 'previous' ? 'active' : ''}`}
-            onClick={() => setTab('previous')}
+            className={`filter-chip ${launchTab === "previous" ? "active" : ""}`}
+            onClick={() => setTab("previous")}
           >
             Previous
           </button>
@@ -82,20 +82,18 @@ export function LaunchTab() {
         {/* TIMELINE TOGGLE */}
         <div className="timeline-toggle">
           <button
-            className={`timeline-toggle-btn ${timelineEnabled ? 'active' : ''}`}
+            className={`timeline-toggle-btn ${timelineEnabled ? "active" : ""}`}
             onClick={() => setTimelineEnabled(!timelineEnabled)}
           >
-            {timelineEnabled ? 'Timeline: On' : 'Timeline: Off'}
+            {timelineEnabled ? "Timeline: On" : "Timeline: Off"}
           </button>
         </div>
       </div>
 
       <div className="launches-list">
-        <div className="list-count">
-          {launches.length} launches
-        </div>
+        <div className="list-count">{launches.length} launches</div>
 
-        {launches.map(launch => (
+        {launches.map((launch) => (
           <LaunchCard
             key={launch.id}
             launch={launch}

@@ -1,7 +1,7 @@
 // src/components/Sidebar/cards/PadCard.tsx
-import { Pad } from '../../../lib/api';
-import { getCountryFlag } from '../../../lib/utils';
-import './PadCard.css';
+import { Pad } from "../../../lib/api";
+import { getCountryFlag } from "../../../lib/utils";
+import "./PadCard.css";
 
 interface PadCardProps {
   pad: Pad;
@@ -22,7 +22,7 @@ export function PadCard({ pad, launchCount, onClick }: PadCardProps) {
           )}
         </div>
       </div>
-      
+
       <div className="pad-card-stats">
         <div className="pad-stat-value">{launchCount}</div>
         <div className="pad-stat-label">launches</div>

@@ -126,8 +126,8 @@ export function Timeline() {
     if (!timelineDate) return null;
 
     // Get timeline launches using the helper function
-    const launches = useLaunchStore.getState();
-    const timelineLaunches = getTimelineLaunches(launches);
+    const state = useLaunchStore.getState();
+    const timelineLaunches = getTimelineLaunches(state.launches);
     
     const visibleLaunches = timelineLaunches.filter(l => 
       l.net && new Date(l.net) <= timelineDate

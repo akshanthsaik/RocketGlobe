@@ -11,29 +11,34 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--bg-surface);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
 }
 
 .agency-logo-large img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+  padding: var(--space-2);
 }
 
 .agency-name {
-  font-size: var(--text-xl);
+  font-size: var(--text-2xl);
   font-weight: var(--weight-bold);
   color: var(--text-primary);
   margin: 0 0 var(--space-2) 0;
+  line-height: 1.2;
 }
 
 .agency-abbrev {
   font-size: var(--text-base);
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
   font-family: var(--font-mono);
 }
 
 .agency-description {
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   color: var(--text-secondary);
   line-height: 1.6;
   margin: 0;

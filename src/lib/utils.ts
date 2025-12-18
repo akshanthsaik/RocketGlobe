@@ -1,3 +1,4 @@
+// src/lib/utils.ts
 import type { Launch } from './api';
 
 /**
@@ -50,6 +51,30 @@ export function formatDateShort(dateString?: string | null): string {
 }
 
 /**
+ * Format time in 24-hour format
+ */
+export function formatTime(dateString?: string | null): string {
+  if (!dateString) return 'TBD';
+  
+  try {
+    const date = new Date(dateString);
+    
+    if (isNaN(date.getTime())) {
+      return 'Invalid Date';
+    }
+    
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+  } catch {
+    return 'Invalid Date';
+  }
+}
+
+/**
  * Format relative time (e.g., "in 3 days", "2 hours ago")
  */
 export function formatRelativeTime(dateString?: string | null): string {
@@ -89,7 +114,7 @@ export function formatRelativeTime(dateString?: string | null): string {
 }
 
 /**
- * Get status color class based on launch status
+ * Get status color based on launch status
  */
 export function getStatusColor(status?: string | null): string {
   if (!status) return 'gray';
@@ -97,30 +122,29 @@ export function getStatusColor(status?: string | null): string {
   const statusLower = status.toLowerCase();
   
   if (statusLower.includes('success')) return 'green';
-  if (statusLower.includes('fail')) return 'red';
+  if (statusLower.includes('failure') || statusLower.includes('failed')) return 'red';
   if (statusLower.includes('partial')) return 'orange';
-  if (statusLower.includes('hold') || statusLower.includes('tbd') || statusLower.includes('determined')) return 'orange';
+  if (statusLower.includes('hold')) return 'orange';
+  if (statusLower.includes('tbd') || statusLower.includes('determined')) return 'yellow';
   if (statusLower.includes('go')) return 'blue';
   
   return 'gray';
 }
 
 /**
- * Get launch status emoji
+ * Get status badge color (CSS var)
  */
-export function getStatusEmoji(status?: string | null): string {
-  if (!status) return '❓';
+export function getStatusBadgeColor(status?: string | null): string {
+  const colorMap: Record<string, string> = {
+    'green': 'var(--accent-green)',
+    'red': 'var(--accent-red)',
+    'orange': 'var(--accent-orange)',
+    'yellow': 'var(--accent-yellow)',
+    'blue': 'var(--accent-blue)',
+    'gray': 'var(--text-tertiary)',
+  };
   
-  const statusLower = status.toLowerCase();
-  
-  if (statusLower.includes('success')) return '✅';
-  if (statusLower.includes('fail')) return '❌';
-  if (statusLower.includes('partial')) return '⚠️';
-  if (statusLower.includes('hold')) return '⏸️';
-  if (statusLower.includes('tbd')) return '🕐';
-  if (statusLower.includes('go')) return '🚀';
-  
-  return '❓';
+  return colorMap[getStatusColor(status)] || colorMap['gray'];
 }
 
 /**
@@ -132,6 +156,7 @@ export function getCountdown(dateString?: string | null): {
   minutes: number;
   seconds: number;
   isPast: boolean;
+  display: string;
 } | null {
   if (!dateString) return null;
   
@@ -148,7 +173,13 @@ export function getCountdown(dateString?: string | null): {
     const minutes = Math.floor((absDiffMs % (1000 * 60 * 60)) / (1000 * 60));
     const seconds = Math.floor((absDiffMs % (1000 * 60)) / 1000);
     
-    return { days, hours, minutes, seconds, isPast };
+    let display = '';
+    if (days > 0) display = `${days}d ${hours}h`;
+    else if (hours > 0) display = `${hours}h ${minutes}m`;
+    else if (minutes > 0) display = `${minutes}m ${seconds}s`;
+    else display = `${seconds}s`;
+    
+    return { days, hours, minutes, seconds, isPast, display };
   } catch {
     return null;
   }
@@ -163,14 +194,39 @@ export function getCountryFlag(countryCode?: string | null): string {
   try {
     const code = countryCode.toUpperCase();
     
+    if (code.length !== 2 && code.length !== 3) return '🌍';
+    
+    // For 3-letter codes, convert to 2-letter
+    const twoLetterCode = code.length === 3 ? code.substring(0, 2) : code;
+    
     // Convert country code to flag emoji
-    // Each letter is offset by 127397 from its ASCII value
     return String.fromCodePoint(
-      ...code.split('').map(char => 127397 + char.charCodeAt(0))
+      ...twoLetterCode.split('').map(char => 127397 + char.charCodeAt(0))
     );
   } catch {
     return '🌍';
   }
+}
+
+/**
+ * Get country name from country code
+ */
+export const COUNTRY_NAMES: Record<string, string> = {
+  'USA': 'United States',
+  'RUS': 'Russia',
+  'CHN': 'China',
+  'IND': 'India',
+  'JPN': 'Japan',
+  'ESA': 'Europe',
+  'KOR': 'South Korea',
+  'IRN': 'Iran',
+  'ISR': 'Israel',
+  'NZL': 'New Zealand',
+};
+
+export function getCountryName(countryCode?: string | null): string {
+  if (!countryCode) return 'Unknown';
+  return COUNTRY_NAMES[countryCode.toUpperCase()] || countryCode;
 }
 
 /**
@@ -276,18 +332,60 @@ export function debounce<T extends (...args: any[]) => any>(
 }
 
 /**
- * Generate random color for markers
+ * Generate color for rocket family
  */
-export function getRandomColor(): string {
-  const colors = [
-    '#4a8aea',
-    '#00d9ff',
-    '#00ff88',
-    '#ff8c42',
-    '#ff4757',
-    '#a55eea'
-  ];
-  return colors[Math.floor(Math.random() * colors.length)];
+export const ROCKET_FAMILY_COLORS: Record<string, string> = {
+  'Falcon': '#60a5fa',
+  'Soyuz': '#f87171',
+  'Atlas': '#fb923c',
+  'Delta': '#fbbf24',
+  'Ariane': '#4ade80',
+  'Proton': '#22d3ee',
+  'Long March': '#f472b6',
+  'GSLV': '#a78bfa',
+  'H-IIA': '#60a5fa',
+  'Epsilon': '#22d3ee',
+};
+
+export function getRocketFamilyColor(family?: string | null): string {
+  if (!family) return '#a3a3a3';
+  
+  for (const [key, color] of Object.entries(ROCKET_FAMILY_COLORS)) {
+    if (family.toLowerCase().includes(key.toLowerCase())) {
+      return color;
+    }
+  }
+  
+  return '#a3a3a3';
+}
+
+/**
+ * Generate color for country
+ */
+export const COUNTRY_COLORS: Record<string, string> = {
+  'USA': '#60a5fa',
+  'RUS': '#f87171',
+  'CHN': '#fbbf24',
+  'IND': '#4ade80',
+  'JPN': '#f472b6',
+  'ESA': '#22d3ee',
+  'KOR': '#fb923c',
+  'IRN': '#a78bfa',
+  'ISR': '#10b981',
+  'NZL': '#8b5cf6',
+};
+
+export function getCountryColor(countryCode?: string | null): string {
+  if (!countryCode) return '#a3a3a3';
+  return COUNTRY_COLORS[countryCode.toUpperCase()] || '#a3a3a3';
+}
+
+/**
+ * Format number with commas
+ */
+export function formatNumber(num: number | null | undefined): string {
+  if (num === null || num === undefined) return '0';
+  return num.toLocaleString('en-US');
 }
 
 /**
@@ -302,4 +400,45 @@ export function formatCoordinates(lat?: number | null, lon?: number | null): str
   const lonDir = lon >= 0 ? 'E' : 'W';
   
   return `${Math.abs(lat).toFixed(4)}° ${latDir}, ${Math.abs(lon).toFixed(4)}° ${lonDir}`;
+}
+
+/**
+ * Check if date is in the past
+ */
+export function isPastDate(dateString?: string | null): boolean {
+  if (!dateString) return false;
+  try {
+    return new Date(dateString) < new Date();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Check if date is today
+ */
+export function isToday(dateString?: string | null): boolean {
+  if (!dateString) return false;
+  try {
+    const date = new Date(dateString);
+    const today = new Date();
+    return date.toDateString() === today.toDateString();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get days until launch
+ */
+export function getDaysUntilLaunch(dateString?: string | null): number | null {
+  if (!dateString) return null;
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = date.getTime() - now.getTime();
+    return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  } catch {
+    return null;
+  }
 }

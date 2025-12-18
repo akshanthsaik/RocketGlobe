@@ -3,7 +3,7 @@ const API_BASE_URL = 'http://127.0.0.1:8000/api';
 // Types matching backend schemas EXACTLY
 export interface Agency {
   id: number;
-  ll2_id: number;
+  ll2_id?: number | null;
   name: string;
   abbrev?: string | null;
   type?: string | null;
@@ -17,40 +17,61 @@ export interface Agency {
 
 export interface Pad {
   id: number;
-  ll2_id: number;
+  ll2_id?: number | null;
   name: string;
   latitude: number;
   longitude: number;
   country_code?: string | null;
   map_url?: string | null;
   total_launch_count: number;
+  agency_id?: number | null;
 }
 
 export interface Rocket {
   id: number;
-  ll2_id: number;
+  ll2_id?: number | null;
   name: string;
   family?: string | null;
   variant?: string | null;
   full_name?: string | null;
   description?: string | null;
+  length?: number | null;
+  diameter?: number | null;
+  leo_capacity?: number | null;
+  gto_capacity?: number | null;
+  launch_mass?: number | null;
+  thrust?: number | null;
+  is_reusable?: boolean | null;
   manufacturer_id?: number | null;
   is_active: boolean;
 }
 
 export interface Launch {
   id: number;
-  ll2_id: string;
+  ll2_id?: string | null;
   name: string;
   status?: string | null;
-  net?: string | null; // ISO datetime string
+  net?: string | null;
   image_url?: string | null;
   pad_id?: number | null;
   rocket_id?: number | null;
   agency_id?: number | null;
-  window_start?: string | null; // ISO datetime string
-  window_end?: string | null; // ISO datetime string
+  window_start?: string | null;
+  window_end?: string | null;
+  mission_name?: string | null;
+  mission_description?: string | null;
+  mission_type?: string | null;
+  orbit?: string | null;
+  webcast_live?: boolean | null;
+  video_url?: string | null;
 }
+
+// Status classification
+export const LAUNCH_STATUS = {
+  UPCOMING: ['Go', 'TBD', 'TBC'],
+  DECIDED: ['Go for Launch'],
+  PREVIOUS: ['Success', 'Failure', 'Partial Failure'],
+} as const;
 
 // API Client
 class RocketGlobeAPI {
@@ -145,6 +166,7 @@ class RocketGlobeAPI {
     limit?: number;
     country_code?: string;
     type?: string;
+    is_active?: boolean;
   }): Promise<Agency[]> {
     const query = new URLSearchParams();
     if (params) {

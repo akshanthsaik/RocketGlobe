@@ -1,81 +1,137 @@
 /* src/App.css */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-html, body {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
 
 .app {
-  width: 100vw;
-  height: 100vh;
-  position: relative;
-  background: #000;
-  overflow: hidden;
-}
-
-.error-screen {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   height: 100vh;
-  background: #000;
-  color: #fff;
 }
 
-.error-screen h1 {
-  margin-bottom: 20px;
-  font-size: 32px;
+/* Header sits on top using its own height */
+
+/* Timeline row – only rendered when enabled */
+.timeline-wrapper {
+  flex: 0 0 var(--timeline-height, 72px);
+  border-top: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-dark);
 }
 
-.error-screen p {
-  margin-bottom: 30px;
-  color: rgba(255, 255, 255, 0.7);
+/* Main content (sidebar + globe) occupies remaining height */
+.main-container {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  position: relative;
 }
 
-.error-screen button {
-  padding: 12px 24px;
-  background: #3b82f6;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 16px;
-  transition: background 0.2s;
+/* Ensure sidebar and globe classes match your components */
+.main-container .sidebar {
+  /* existing sidebar width styling, e.g.: */
+  width: var(--sidebar-width-default);
+  flex-shrink: 0;
 }
 
-.error-screen button:hover {
-  background: #2563eb;
+.main-container .globe-container {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
 }
 
+/* ===== LOADING OVERLAY ===== */
 .loading-overlay {
   position: fixed;
-  inset: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   background: rgba(0, 0, 0, 0.9);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  color: white;
-  z-index: 9999;
-  gap: 20px;
+  gap: var(--space-6);
+  z-index: var(--z-loading);
 }
 
 .loading-spinner {
   width: 50px;
   height: 50px;
-  border: 4px solid rgba(255, 255, 255, 0.1);
-  border-top-color: #3b82f6;
+  border: 3px solid var(--border-normal);
+  border-top-color: var(--accent-blue);
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
 
+.loading-text {
+  color: var(--text-secondary);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-medium);
+}
+
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ===== ERROR OVERLAY ===== */
+.error-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-space);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-loading);
+}
+
+.error-content {
+  text-align: center;
+  padding: var(--space-8);
+  max-width: 500px;
+}
+
+.error-content h1 {
+  color: var(--accent-red);
+  font-size: var(--text-2xl);
+  margin-bottom: var(--space-4);
+}
+
+.error-content p {
+  color: var(--text-secondary);
+  font-size: var(--text-base);
+  margin-bottom: var(--space-6);
+  line-height: 1.6;
+}
+
+.retry-btn {
+  background: var(--accent-blue);
+  color: var(--text-primary);
+  padding: var(--space-3) var(--space-6);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  border: none;
+}
+
+.retry-btn:hover {
+  background: var(--accent-blue-bright);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(96, 165, 250, 0.3);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .main-container {
+    flex-direction: column;
+  }
+
+  .main-container .sidebar {
+    width: 100%;
+  }
 }

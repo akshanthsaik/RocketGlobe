@@ -66,11 +66,11 @@ export interface Launch {
   video_url?: string | null;
 }
 
-// Status classification
+// Status classification - Updated to match actual LL2 API statuses
 export const LAUNCH_STATUS = {
-  UPCOMING: ["Go", "TBD", "TBC"],
-  DECIDED: ["Go for Launch"],
-  PREVIOUS: ["Success", "Failure", "Partial Failure"],
+  UPCOMING: ["Go", "TBD", "TBC", "On Hold", "To Be Confirmed", "To Be Determined"],
+  DECIDED: ["Go for Launch", "Go"],
+  PREVIOUS: ["Success", "Failure", "Partial Failure", "Success (Partial Failure)"],
 } as const;
 
 // API Client

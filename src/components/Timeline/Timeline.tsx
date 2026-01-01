@@ -19,7 +19,6 @@ export function Timeline() {
 
   const [isDragging, setIsDragging] = useState(false);
   const scrubberRef = useRef<HTMLDivElement>(null);
-  const animationFrameRef = useRef<number | null>(null);
 
   // Initialize timeline to start date if not set
   useEffect(() => {
@@ -28,55 +27,9 @@ export function Timeline() {
     }
   }, [timelineRange, timelineDate, setTimelineDate]);
 
-  // Animation loop
-  useEffect(() => {
-    if (!isTimelinePlaying || !timelineRange || !timelineDate) {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-      return;
-    }
-
-    const [startDate, endDate] = timelineRange;
-    const daysPerSecond = timelineSpeed * 10;
-    const msPerFrame = (daysPerSecond * 24 * 60 * 60 * 1000) / 60;
-
-    let lastTime = Date.now();
-
-    const animate = () => {
-      const now = Date.now();
-      const delta = now - lastTime;
-      lastTime = now;
-
-      const currentMs = timelineDate.getTime();
-      const newMs = currentMs + (msPerFrame * delta) / 16.67;
-
-      if (newMs >= endDate.getTime()) {
-        pauseTimeline();
-        setTimelineDate(endDate);
-        return;
-      }
-
-      setTimelineDate(new Date(newMs));
-      animationFrameRef.current = requestAnimationFrame(animate);
-    };
-
-    animationFrameRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, [
-    isTimelinePlaying,
-    timelineSpeed,
-    timelineDate,
-    timelineRange,
-    setTimelineDate,
-    pauseTimeline,
-  ]);
+  // Step-based timeline - removed continuous animation loop
+  // Timeline now steps through launches one at a time via store's playTimeline
+  // This prevents camera overlap and blurriness
 
   const getProgress = useCallback(() => {
     if (!timelineRange || !timelineDate) return 0;
@@ -270,7 +223,7 @@ export function Timeline() {
 
           <div className="controls-group">
             <div className="speed-selector">
-              {[1, 2, 5, 10, 50].map((speed) => (
+              {[0.5, 1, 2, 5, 10].map((speed) => (
                 <button
                   key={speed}
                   className={`speed-btn ${timelineSpeed === speed ? "active" : ""}`}

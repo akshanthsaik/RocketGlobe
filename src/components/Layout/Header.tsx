@@ -1,4 +1,5 @@
 // src/components/Layout/Header.tsx
+import { useState } from "react";
 import { useLaunchStore } from "../../store/launchStore";
 import {
   isUpcomingLaunch,
@@ -19,6 +20,8 @@ export function Header() {
   const fetchAllData = useLaunchStore((state) => state.fetchAllData);
   const isLoading = useLaunchStore((state) => state.isLoading);
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // Calculate stats
   const upcomingCount = launches.filter(isUpcomingLaunch).length;
   const decidedCount = launches.filter(isDecidedLaunch).length;
@@ -26,6 +29,25 @@ export function Header() {
 
   const handleRefresh = () => {
     fetchAllData();
+  };
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch("http://127.0.0.1:8000/admin/sync", {
+        method: "POST",
+      });
+      if (response.ok) {
+        // Refresh data after sync
+        await fetchAllData();
+      } else {
+        console.error("Sync failed:", await response.text());
+      }
+    } catch (error) {
+      console.error("Sync failed:", error);
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   return (
@@ -210,6 +232,29 @@ export function Header() {
               </div>
             )}
           </div>
+
+          <button
+            className={`sync-btn ${isSyncing ? "loading" : ""}`}
+            onClick={handleSync}
+            disabled={isSyncing}
+            aria-label="Sync from LL2 API"
+            title="Sync data from Launch Library 2 API"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              className={isSyncing ? "spinning" : ""}
+            >
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+          </button>
 
           <button
             className={`refresh-btn ${isLoading ? "loading" : ""}`}

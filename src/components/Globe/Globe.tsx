@@ -30,7 +30,6 @@ export function Globe() {
   const pads = useLaunchStore((state) => state.pads);
   const launches = useLaunchStore((state) => state.launches);
   const agencies = useLaunchStore((state) => state.agencies);
-  const rockets = useLaunchStore((state) => state.rockets);
 
   const selectedLaunch = useLaunchStore((state) => state.selectedLaunch);
   const selectedRocket = useLaunchStore((state) => state.selectedRocket);
@@ -53,11 +52,20 @@ export function Globe() {
   // Compute pads to show based on mode and filters
   const padsToShow = useMemo(() => {
     const state = useLaunchStore.getState();
+    let filteredPads = pads;
+
+    // Apply search filter for pads mode
+    if (globeMode === "pads" && state.searchQuery) {
+      const query = state.searchQuery.toLowerCase();
+      filteredPads = filteredPads.filter((p) =>
+        p.name.toLowerCase().includes(query)
+      );
+    }
 
     if (globeMode === "launches") {
       // WHEN TIMELINE IS ENABLED: Show all pads (they'll be colored based on activity)
       if (timelineEnabled) {
-        return pads;
+        return filteredPads;
       }
 
       // WHEN TIMELINE IS DISABLED: Show only pads with active launches (original behavior)
@@ -65,17 +73,17 @@ export function Globe() {
       const padIds = new Set(
         launchesForPads.map((l) => l.pad_id).filter((id): id is number => !!id)
       );
-      return pads.filter((p) => padIds.has(p.id));
+      return filteredPads.filter((p) => padIds.has(p.id));
     }
 
-    if (globeMode === "pads") return pads;
+    if (globeMode === "pads") return filteredPads;
 
     if (globeMode === "rockets" && selectedRocket) {
       const rocketLaunches = getLaunchesForRocket(launches, selectedRocket.id);
       const padIds = new Set(
         rocketLaunches.map((l) => l.pad_id).filter((id): id is number => !!id)
       );
-      return pads.filter((p) => padIds.has(p.id));
+      return filteredPads.filter((p) => padIds.has(p.id));
     }
 
     if (globeMode === "agencies" && selectedAgency) {
@@ -83,7 +91,7 @@ export function Globe() {
       const padIds = new Set(
         agencyLaunches.map((l) => l.pad_id).filter((id): id is number => !!id)
       );
-      return pads.filter((p) => padIds.has(p.id));
+      return filteredPads.filter((p) => padIds.has(p.id));
     }
 
     return [] as typeof pads;
@@ -131,7 +139,10 @@ export function Globe() {
       try {
         if (!containerRef.current) throw new Error("Container lost");
 
-        const terrainProvider = await Cesium.createWorldTerrainAsync();
+        // Use EllipsoidTerrainProvider for faster initial load
+        const terrainProvider = new Cesium.EllipsoidTerrainProvider();
+        // Optionally upgrade to WorldTerrainAsync later for better visuals
+        // const terrainProvider = await Cesium.createWorldTerrainAsync();
 
         viewer = new Cesium.Viewer(containerRef.current, {
           terrainProvider,
@@ -146,6 +157,9 @@ export function Globe() {
           infoBox: false,
           selectionIndicator: false,
           shouldAnimate: false,
+          // Performance optimizations
+          requestRenderMode: true,
+          maximumRenderTimeChange: Infinity,
         });
 
         viewer.imageryLayers.removeAll();
@@ -329,8 +343,8 @@ export function Globe() {
       }
 
 
-      // Render agency markers on top
-      renderAgencies(viewer, agencies);
+      // Render agency markers on top - use pad locations for agencies without coordinates
+      renderAgencies(viewer, agencies, pads, launches);
       return;
     } else {
       // Hide country highlights in other modes
@@ -357,6 +371,30 @@ export function Globe() {
       globeMode === "launches" && timelineEnabled ? timelineDate : null;
 
     renderPads(viewer, padsToShow, launchesForPads, effectiveTimelineDate);
+    
+    // Highlight current launch during timeline mode
+    if (globeMode === "launches" && timelineEnabled && timelineDate) {
+      const state = useLaunchStore.getState();
+      const timelineLaunches = getTimelineLaunchesForGlobe(state);
+      if (timelineLaunches.length > 0) {
+        const currentLaunch = timelineLaunches[timelineLaunches.length - 1];
+        if (currentLaunch?.pad_id) {
+          const currentPad = pads.find((p) => p.id === currentLaunch.pad_id);
+          if (currentPad) {
+            viewer.entities.add({
+              id: "timeline-current",
+              position: Cesium.Cartesian3.fromDegrees(currentPad.longitude, currentPad.latitude),
+              point: {
+                pixelSize: 20,
+                color: Cesium.Color.YELLOW.withAlpha(0.95),
+                outlineColor: Cesium.Color.WHITE,
+                outlineWidth: 3,
+              },
+            });
+          }
+        }
+      }
+    }
   }, [
     viewerReady,
     globeMode,
@@ -366,25 +404,28 @@ export function Globe() {
     isLoading,
     timelineDate,
     timelineEnabled,
+    isTimelinePlaying,
+    pads,
   ]);
 
-  // Camera follow during timeline playback (debounced)
+  // Camera follow during timeline - only on manual steps, not during auto-play
+  // This prevents camera overlap and blurriness during continuous playback
   useEffect(() => {
     if (
       !viewerRef.current ||
       !timelineEnabled ||
-      !isTimelinePlaying ||
       !timelineDate ||
-      globeMode !== "launches"
+      globeMode !== "launches" ||
+      isTimelinePlaying // Don't move camera during auto-play
     ) {
       return;
     }
 
-    // Debounce: only fly if timeline date changed significantly
+    // Only move camera if date changed significantly (manual step)
     if (
       lastTimelineDateRef.current &&
       Math.abs(timelineDate.getTime() - lastTimelineDateRef.current.getTime()) <
-        2000
+        1000
     ) {
       return;
     }
@@ -411,7 +452,7 @@ export function Globe() {
       destination: Cesium.Cartesian3.fromDegrees(
         pad.longitude,
         pad.latitude,
-        75000 // Closer zoom for timeline mode
+        100000 // Comfortable zoom level
       ),
       duration: 1.5,
       complete: () => {
@@ -422,6 +463,42 @@ export function Globe() {
       },
     });
   }, [timelineDate, timelineEnabled, isTimelinePlaying, globeMode, pads]);
+
+  // Fly to rocket's pads when selected
+  useEffect(() => {
+    if (!viewerRef.current || !selectedRocket || globeMode !== "rockets") return;
+
+    const viewer = viewerRef.current;
+    const rocketLaunches = getLaunchesForRocket(launches, selectedRocket.id);
+    const padIds = new Set(
+      rocketLaunches.map((l) => l.pad_id).filter((id): id is number => !!id)
+    );
+    const rocketPads = pads.filter((p) => padIds.has(p.id));
+
+    if (rocketPads.length === 0) return;
+
+    // Calculate bounding box of all pads
+    const lats = rocketPads.map((p) => p.latitude);
+    const lons = rocketPads.map((p) => p.longitude);
+    const minLat = Math.min(...lats);
+    const maxLat = Math.max(...lats);
+    const minLon = Math.min(...lons);
+    const maxLon = Math.max(...lons);
+
+    const centerLat = (minLat + maxLat) / 2;
+    const centerLon = (minLon + maxLon) / 2;
+    const latSpan = maxLat - minLat;
+    const lonSpan = maxLon - minLon;
+    const maxSpan = Math.max(latSpan, lonSpan);
+    
+    // Calculate appropriate height based on span
+    const height = maxSpan > 10 ? 2000000 : maxSpan > 5 ? 1000000 : 500000;
+
+    viewer.camera.flyTo({
+      destination: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, height),
+      duration: 2,
+    });
+  }, [selectedRocket, globeMode, pads, launches]);
 
   // Highlight selected launch (manual click)
   useEffect(() => {
@@ -467,8 +544,8 @@ export function Globe() {
       <div ref={containerRef} className="cesium-viewer" />
       <Legend mode={globeMode} />
 
-      {/* Inset close-up view */}
-      {selectedLaunch && (
+      {/* Inset close-up view - Show when launch is selected, hide during timeline auto-play to reduce clutter */}
+      {selectedLaunch && !isLoading && !isTimelinePlaying && (
         <PadInsetView
           pad={pads.find((p) => p.id === selectedLaunch.pad_id)}
           launch={selectedLaunch}
@@ -569,14 +646,31 @@ function renderPads(
 }
 
 /**
- * Render agencies on the globe with labels
+ * Render agencies on the globe - Use country centroids or pad locations
  */
-function renderAgencies(viewer: Cesium.Viewer, agencies: any[]) {
-  const agenciesWithCoords = agencies.filter(
-    (a: any) => a.latitude && a.longitude
-  );
+function renderAgencies(viewer: Cesium.Viewer, agencies: any[], pads: any[], launches: any[]) {
+  // For agencies without coordinates, use their country's center or associated pad locations
+  const agenciesToRender = agencies.map((agency) => {
+    // Try to find coordinates from associated pads
+    const agencyLaunches = launches.filter((l) => l.agency_id === agency.id);
+    const agencyPadIds = new Set(agencyLaunches.map((l) => l.pad_id).filter(Boolean));
+    const agencyPads = pads.filter((p) => agencyPadIds.has(p.id));
+    
+    if (agencyPads.length > 0) {
+      // Use average of pad locations
+      const avgLat = agencyPads.reduce((sum, p) => sum + p.latitude, 0) / agencyPads.length;
+      const avgLon = agencyPads.reduce((sum, p) => sum + p.longitude, 0) / agencyPads.length;
+      return { ...agency, latitude: avgLat, longitude: avgLon };
+    }
+    
+    // If no pads, try to use country code to get approximate location
+    // For now, return null if no coordinates
+    return (agency as any).latitude && (agency as any).longitude ? agency : null;
+  }).filter(Boolean);
 
-  agenciesWithCoords.forEach((agency: any) => {
+  agenciesToRender.forEach((agency: any) => {
+    if (!agency.latitude || !agency.longitude) return;
+    
     viewer.entities.add({
       id: `agency-${agency.id}`,
       name: agency.name,

@@ -51,7 +51,7 @@ interface LaunchStoreState {
   // Timeline (launches mode only)
   timelineDate: Date | null;
   isTimelinePlaying: boolean;
-  timelineSpeed: 1 | 2 | 5 | 10 | 50;
+  timelineSpeed: 0.5 | 1 | 2 | 5 | 10;
   timelineRange: [Date, Date] | null;
 
   // Filters
@@ -90,7 +90,7 @@ interface LaunchStoreState {
   playTimeline: () => void;
   pauseTimeline: () => void;
   resetTimeline: () => void;
-  setTimelineSpeed: (speed: 1 | 2 | 5 | 10 | 50) => void;
+  setTimelineSpeed: (speed: 0.5 | 1 | 2 | 5 | 10) => void;
   nextLaunch: () => void;
   prevLaunch: () => void;
   setTimelineEnabled: (enabled: boolean) => void;
@@ -109,13 +109,27 @@ interface LaunchStoreState {
   navigateToAgency: (agencyId: number) => void;
 }
 
-// Helpers (unchanged)
+// Helpers - Fixed to be more lenient and accurate
 export const isUpcomingLaunch = (launch: Launch): boolean => {
-  if (!launch.net || !launch.status) return false;
-  return (
-    LAUNCH_STATUS.UPCOMING.includes(launch.status as any) &&
-    new Date(launch.net) > new Date()
-  );
+  if (!launch.net) return false;
+  const launchDate = new Date(launch.net);
+  const now = new Date();
+  
+  // If launch date is in the future, it's upcoming
+  if (launchDate > now) {
+    // Check if status explicitly marks it as not upcoming
+    if (launch.status && LAUNCH_STATUS.PREVIOUS.includes(launch.status as any)) {
+      return false;
+    }
+    return true;
+  }
+  
+  // If date is past but status says upcoming, trust the status
+  if (launch.status && LAUNCH_STATUS.UPCOMING.includes(launch.status as any)) {
+    return true;
+  }
+  
+  return false;
 };
 
 export const isDecidedLaunch = (launch: Launch): boolean => {
@@ -124,11 +138,32 @@ export const isDecidedLaunch = (launch: Launch): boolean => {
 };
 
 export const isPreviousLaunch = (launch: Launch): boolean => {
-  if (!launch.net || !launch.status) return false;
-  return (
-    LAUNCH_STATUS.PREVIOUS.includes(launch.status as any) ||
-    new Date(launch.net) <= new Date()
-  );
+  if (!launch.net) {
+    // If no date but has a previous status, it's previous
+    if (launch.status && LAUNCH_STATUS.PREVIOUS.includes(launch.status as any)) {
+      return true;
+    }
+    return false;
+  }
+  
+  const launchDate = new Date(launch.net);
+  const now = new Date();
+  
+  // If date is in the past, it's previous (unless status says otherwise)
+  if (launchDate <= now) {
+    // Unless status explicitly says it's upcoming
+    if (launch.status && LAUNCH_STATUS.UPCOMING.includes(launch.status as any)) {
+      return false;
+    }
+    return true;
+  }
+  
+  // If status says previous, trust it
+  if (launch.status && LAUNCH_STATUS.PREVIOUS.includes(launch.status as any)) {
+    return true;
+  }
+  
+  return false;
 };
 
 export const getUpcomingLaunches = (launches: Launch[]): Launch[] =>
@@ -329,14 +364,39 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
     const stack = state.sidebarViewStack;
 
     if (stack.length > 1) {
-      set({ sidebarViewStack: stack.slice(0, -1) });
+      // Pop the current view
+      const newStack = stack.slice(0, -1);
+      const previousView = newStack[newStack.length - 1];
+      
+      // Clear selections if going back to list view
+      if (previousView.type === "launch-list" || 
+          (previousView.type === "pad-detail" && state.globeMode === "pads" && !state.selectedPad) ||
+          (previousView.type === "rocket-detail" && state.globeMode === "rockets" && !state.selectedRocket) ||
+          (previousView.type === "agency-detail" && state.globeMode === "agencies" && !state.selectedAgency)) {
+        set({ 
+          sidebarViewStack: newStack,
+          selectedLaunch: null,
+          selectedPad: previousView.type === "pad-detail" ? state.selectedPad : null,
+          selectedRocket: previousView.type === "rocket-detail" ? state.selectedRocket : null,
+          selectedAgency: previousView.type === "agency-detail" ? state.selectedAgency : null,
+        });
+      } else {
+        set({ sidebarViewStack: newStack });
+      }
     } else {
+      // Reset to default view for current mode
       let firstView: ViewType = "launch-list";
       if (state.globeMode === "pads") firstView = "pad-detail";
       else if (state.globeMode === "rockets") firstView = "rocket-detail";
       else if (state.globeMode === "agencies") firstView = "agency-detail";
 
-      set({ sidebarViewStack: [{ type: firstView }] });
+      set({ 
+        sidebarViewStack: [{ type: firstView }],
+        selectedLaunch: null,
+        selectedPad: null,
+        selectedAgency: null,
+        selectedRocket: null,
+      });
     }
   },
 
@@ -402,6 +462,45 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
       set({ timelineDate: state.timelineRange[0] });
     }
     set({ isTimelinePlaying: true });
+    
+    // Start step-based auto-play
+    const playNext = () => {
+      const currentState = get();
+      if (!currentState.isTimelinePlaying) return;
+      
+      const launches = getTimelineLaunches(currentState.launches);
+      if (launches.length === 0) {
+        set({ isTimelinePlaying: false });
+        return;
+      }
+      
+      const currentDate = currentState.timelineDate;
+      if (!currentDate) {
+        set({ isTimelinePlaying: false });
+        return;
+      }
+      
+      // Find next launch after current date
+      const nextLaunch = launches.find(
+        (l) => l.net && new Date(l.net) > currentDate
+      );
+      
+      if (nextLaunch?.net) {
+        set({ 
+          timelineDate: new Date(nextLaunch.net),
+          selectedLaunch: nextLaunch, // Auto-select during playback
+        });
+        // Schedule next step based on speed (slower = more delay)
+        const delay = 4000 / currentState.timelineSpeed; // 4 seconds at 1x, slower overall
+        setTimeout(playNext, delay);
+      } else {
+        // Reached end
+        set({ isTimelinePlaying: false });
+      }
+    };
+    
+    // Start playing after a short delay
+    setTimeout(playNext, 500);
   },
 
   pauseTimeline: () => set({ isTimelinePlaying: false }),
@@ -426,6 +525,8 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
     );
     if (nextLaunch?.net) {
       set({ timelineDate: new Date(nextLaunch.net) });
+      // Auto-select the launch when stepping
+      set({ selectedLaunch: nextLaunch });
     }
   },
 
@@ -442,6 +543,8 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
       const prevLaunch = prevLaunches[prevLaunches.length - 1];
       if (prevLaunch.net) {
         set({ timelineDate: new Date(prevLaunch.net) });
+        // Auto-select the launch when stepping
+        set({ selectedLaunch: prevLaunch });
       }
     }
   },

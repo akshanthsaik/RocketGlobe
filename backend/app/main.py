@@ -106,52 +106,67 @@ async def health(db: Session = Depends(get_db)):
 # Admin Endpoints
 # ============================================================================
 
-@app.post("/admin/sync", tags=["admin"])
-async def trigger_sync(db: Session = Depends(get_db)):
+@app.post("/admin/sync", tags=["admin"], status_code=202)
+async def trigger_sync():
     """
     Manually trigger full data sync from Launch Library 2 API.
-    
-    This will sync:
-    - All agencies (space organizations)
-    - All launch pads (with GPS coordinates)
-    - All rocket configurations
-    - All launches (historical and upcoming)
-    
-    Note: May take 10-20 minutes for full sync. Subject to API rate limits.
+
+    This starts the sync job in the background and returns 202 Accepted.
+    The actual sync uses the DB-level lock to prevent concurrent runs.
     """
     from app.workers.sync_worker import sync_all
-    
+    import asyncio
+
+    async def _run_sync():
+        db = SessionLocal()
+        try:
+            logger.info("🔄 Background sync started...")
+            result = await sync_all(db)
+            logger.info(f"✅ Background sync completed: {result}")
+        except Exception as e:
+            logger.error(f"❌ Background sync failed: {e}")
+        finally:
+            db.close()
+
+    # Check current sync lock - if locked, refuse to start another
     try:
-        logger.info("🔄 Starting manual sync...")
-        result = await sync_all(db)
-        logger.info(f"✅ Sync completed: {result}")
-        
-        return {
-            "status": "success",
-            "message": "Data sync completed successfully",
-            "counts": result
-        }
-    except Exception as e:
-        logger.error(f"❌ Sync failed: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Sync failed: {str(e)}"
-        )
+        db_check = SessionLocal()
+        from app.models import SyncState
+        row = db_check.query(SyncState).filter(SyncState.resource == "sync_all").first()
+        if row and row.is_locked:
+            return JSONResponse(status_code=409, content={"status": "conflict", "message": "Sync already running"})
+    finally:
+        db_check.close()
+
+    # Schedule background task on the running event loop
+    asyncio.create_task(_run_sync())
+
+    return JSONResponse(status_code=202, content={"status": "started", "message": "Background sync scheduled"})
 
 
 @app.get("/admin/sync-status", tags=["admin"])
 async def get_sync_status(db: Session = Depends(get_db)):
     """Get current sync status and data counts."""
-    from app.models import Launch, Pad, Agency, Rocket
+    from app.models import Launch, Pad, Agency, Rocket, SyncState
     from datetime import datetime
-    
+
     try:
         # Get latest update timestamps
         latest_launch = db.query(Launch).order_by(Launch.updated_at.desc()).first()
         latest_agency = db.query(Agency).order_by(Agency.updated_at.desc()).first()
-        
+
+        # Check whether a full sync is currently running (DB-level lock)
+        sync_state = db.query(SyncState).filter(SyncState.resource == "sync_all").first()
+        is_sync_running = bool(sync_state and sync_state.is_locked)
+
         return {
             "status": "success",
+            "is_sync_running": is_sync_running,
+            "sync_lock": {
+                "is_locked": sync_state.is_locked if sync_state else False,
+                "lock_owner": sync_state.lock_owner if sync_state else None,
+                "locked_at": sync_state.locked_at.isoformat() if (sync_state and sync_state.locked_at) else None
+            },
             "data_counts": {
                 "launches": db.query(Launch).count(),
                 "pads": db.query(Pad).count(),

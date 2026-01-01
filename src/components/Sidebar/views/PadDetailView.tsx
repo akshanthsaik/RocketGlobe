@@ -4,7 +4,7 @@ import { useLaunchStore } from "../../../store/launchStore";
 import { Pad } from "../../../lib/api";
 import { formatCoordinates, getCountryFlag } from "../../../lib/utils";
 import { LaunchCard } from "../cards/LaunchCard";
-import "./PadDetailView.css";
+import "./View.css";
 
 interface PadDetailViewProps {
   pad: Pad;

@@ -35,6 +35,13 @@ function App() {
     );
   }
 
+  useEffect(() => {
+  document.documentElement.style.setProperty(
+    '--timeline-active-height',
+    showTimeline ? 'var(--timeline-height)' : '0'
+  );
+}, [showTimeline]);
+
   return (
     <div className="app">
       <Header />

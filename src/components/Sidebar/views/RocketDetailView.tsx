@@ -3,7 +3,7 @@ import { useMemo } from "react";
 import { useLaunchStore } from "../../../store/launchStore";
 import { Rocket } from "../../../lib/api";
 import { LaunchCard } from "../cards/LaunchCard";
-import "./RocketDetailView.css";
+import "./View.css";
 
 interface RocketDetailViewProps {
   rocket: Rocket;

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from sqlalchemy.orm import Session
@@ -18,10 +19,10 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Lifespan events for startup and shutdown."""
-    logger.info("🚀 RocketGlobe Backend starting up...")
-    logger.info("📡 API Documentation available at: http://localhost:8000/docs")
+    logger.info("RocketGlobe Backend starting up...")
+    logger.info("API Documentation available at: http://localhost:8000/docs")
     yield
-    logger.info("👋 RocketGlobe Backend shutting down...")
+    logger.info("RocketGlobe Backend shutting down...")
 
 
 app = FastAPI(
@@ -276,7 +277,7 @@ async def clear_all_data(
         agency_count = db.query(Agency).delete()
         db.commit()
         
-        logger.info(f"✅ Cleared: {launch_count} launches, {rocket_count} rockets, {pad_count} pads, {agency_count} agencies")
+        logger.info(f"Cleared: {launch_count} launches, {rocket_count} rockets, {pad_count} pads, {agency_count} agencies")
         
         return {
             "status": "success",
@@ -307,24 +308,29 @@ app.include_router(api_router, prefix="/api")
 
 @app.exception_handler(404)
 async def not_found_handler(request, exc):
-    """Custom 404 handler."""
-    return {
-        "status": "error",
-        "message": "Endpoint not found",
-        "path": str(request.url),
-        "available_endpoints": "/docs"
-    }
+    return JSONResponse(
+        status_code=404,
+        content={
+            "status": "error",
+            "message": "Endpoint not found",
+            "path": str(request.url),
+            "available_endpoints": "/docs"
+        }
+    )
+
 
 
 @app.exception_handler(500)
 async def server_error_handler(request, exc):
-    """Custom 500 handler."""
     logger.error(f"Internal server error: {exc}")
-    return {
-        "status": "error",
-        "message": "Internal server error",
-        "detail": str(exc)
-    }
+    return JSONResponse(
+        status_code=500,
+        content={
+            "status": "error",
+            "message": "Internal server error"
+        }
+    )
+
 
 
 # ============================================================================

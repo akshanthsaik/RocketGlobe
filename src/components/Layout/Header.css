@@ -1,4 +1,7 @@
-/* src/components/Layout/Header.css */
+/* =========================
+   HEADER CONTAINER
+   ========================= */
+
 .header {
   position: fixed;
   top: 0;
@@ -6,7 +9,7 @@
   right: 0;
   height: var(--header-height);
   background: var(--bg-dark);
-  border-bottom: 1px solid var(--border-normal);
+  border-bottom: 1px solid var(--border-subtle);
   z-index: var(--z-header);
 }
 
@@ -16,10 +19,14 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--space-6);
-  gap: var(--space-8);
+  gap: var(--space-6);
+  max-width: 100%;
 }
 
-/* ===== LEFT SECTION ===== */
+/* =========================
+   LEFT SECTION
+   ========================= */
+
 .header-left {
   display: flex;
   align-items: center;
@@ -28,26 +35,35 @@
 }
 
 .sidebar-toggle-btn {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: transparent;
   border: 1px solid var(--border-normal);
   border-radius: var(--radius-md);
-  color: var(--text-tertiary);
-  transition: all var(--transition-fast);
+  color: var(--text-muted);
   cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .sidebar-toggle-btn:hover {
-  background: var(--bg-hover);
-  border-color: var(--border-bright);
+  background: var(--bg-card-hover);
+  border-color: var(--border-normal);
   color: var(--text-secondary);
 }
 
+.sidebar-toggle-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
 /* Logo */
+
 .logo {
   display: flex;
   align-items: center;
@@ -60,7 +76,6 @@
   align-items: center;
   justify-content: center;
   color: var(--accent-cyan);
-  animation: pulse 2s ease-in-out infinite;
 }
 
 .logo-text-group {
@@ -72,7 +87,6 @@
 .logo-text {
   font-size: var(--text-lg);
   font-weight: var(--weight-bold);
-  letter-spacing: -0.01em;
   color: var(--text-primary);
   line-height: 1;
 }
@@ -80,61 +94,71 @@
 .logo-subtitle {
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
-  color: var(--text-tertiary);
+  color: var(--text-muted);
   letter-spacing: 0.02em;
 }
 
-/* ===== CENTER SECTION - NAVIGATION ===== */
+/* =========================
+   CENTER NAVIGATION
+   ========================= */
+
 .header-nav {
   display: flex;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-2);
   flex: 1;
   justify-content: center;
+  min-width: 0;
 }
 
 .nav-btn {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-2);
   padding: var(--space-2) var(--space-4);
   background: transparent;
   border: 1px solid transparent;
   border-radius: var(--radius-md);
-  color: var(--text-tertiary);
+  color: var(--text-muted);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
-  transition: all var(--transition-fast);
   cursor: pointer;
+  min-height: 40px;
+  white-space: nowrap;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .nav-btn:hover {
-  background: var(--bg-hover);
+  background: var(--bg-card-hover);
   color: var(--text-secondary);
   border-color: var(--border-subtle);
 }
 
 .nav-btn.active {
-  background: var(--bg-surface);
+  background: var(--bg-card);
   border-color: var(--border-normal);
   color: var(--accent-cyan);
 }
 
 .nav-btn svg {
-  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
   opacity: 0.7;
-  transition: opacity var(--transition-fast);
 }
 
+.nav-btn:hover svg,
 .nav-btn.active svg {
   opacity: 1;
 }
 
-.nav-btn:hover svg {
-  opacity: 1;
-}
+/* =========================
+   RIGHT SECTION
+   ========================= */
 
-/* ===== RIGHT SECTION ===== */
 .header-right {
   display: flex;
   align-items: center;
@@ -161,13 +185,12 @@
   font-family: var(--font-mono);
   color: var(--text-primary);
   line-height: 1;
-  letter-spacing: -0.02em;
 }
 
 .stat-label {
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
-  color: var(--text-dim);
+  color: var(--text-muted);
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
@@ -179,7 +202,6 @@
   opacity: 0.5;
 }
 
-/* Status-specific stat cards */
 .stat-card.stat-upcoming .stat-value {
   color: var(--accent-green);
 }
@@ -188,46 +210,42 @@
   color: var(--accent-yellow);
 }
 
-/* Refresh button */
+/* Refresh */
+
 .refresh-btn {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   background: transparent;
   border: 1px solid var(--border-normal);
   border-radius: var(--radius-md);
-  color: var(--text-tertiary);
-  transition: all var(--transition-fast);
+  color: var(--text-muted);
   cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 .refresh-btn:hover {
-  background: var(--bg-hover);
-  border-color: var(--border-bright);
+  background: var(--bg-card-hover);
   color: var(--text-secondary);
-}
-
-.refresh-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 .refresh-btn.loading svg {
   animation: spin 1s linear infinite;
 }
 
-/* ===== RESPONSIVE ===== */
-@media (max-width: 1280px) {
-  .header-content {
-    gap: var(--space-6);
-  }
-
-  .header-stats {
-    gap: var(--space-3);
-  }
+.refresh-btn svg {
+  width: 20px;
+  height: 20px;
 }
+
+/* =========================
+   RESPONSIVE
+   ========================= */
 
 @media (max-width: 1024px) {
   .logo-subtitle {
@@ -239,32 +257,22 @@
   }
 
   .nav-btn {
-    width: 36px;
-    height: 36px;
+    width: 40px;
     padding: var(--space-2);
-    justify-content: center;
-  }
-
-  .header-nav {
-    gap: var(--space-2);
   }
 }
 
 @media (max-width: 768px) {
+  .header {
+    height: var(--header-height-mobile);
+  }
+
   .logo-text-group {
     display: none;
   }
 
-  .header-stats {
-    gap: var(--space-2);
-  }
-
   .stat-value {
     font-size: var(--text-lg);
-  }
-
-  .stat-label {
-    font-size: 9px;
   }
 
   .stat-divider {
@@ -278,31 +286,20 @@
     gap: var(--space-4);
   }
 
-  .header-left {
-    gap: var(--space-2);
-  }
-
   .header-stats {
     display: none;
   }
 
-  .header-nav {
-    gap: var(--space-1);
+  .sidebar-toggle-btn,
+  .refresh-btn,
+  .nav-btn {
+    min-width: 44px;
+    min-height: 44px;
   }
 }
 
 @media (max-width: 480px) {
   .refresh-btn {
     display: none;
-  }
-
-  .nav-btn {
-    width: 32px;
-    height: 32px;
-  }
-
-  .sidebar-toggle-btn {
-    width: 32px;
-    height: 32px;
   }
 }

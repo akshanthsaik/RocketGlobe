@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import { useLaunchStore } from "../../../store/launchStore";
 import { getCountryFlag } from "../../../lib/utils";
-import "./AgenciesTab.css";
+import "./Tab.css";
 
 export function AgenciesTab() {
   const agencies = useLaunchStore((state) => state.agencies);

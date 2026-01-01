@@ -1,7 +1,7 @@
 // src/components/Sidebar/tabs/PadsTab.tsx
 import { useMemo, useState } from "react";
 import { useLaunchStore } from "../../../store/launchStore";
-import "./PadsTab.css";
+import "./Tab.css";
 
 export function PadsTab() {
   const pads = useLaunchStore((state) => state.pads);

@@ -6,11 +6,13 @@ import {
   LaunchTab as LaunchTabType,
 } from "../../../store/launchStore";
 import { LaunchCard } from "../cards/LaunchCard";
-import "./LaunchTab.css";
+import "./Tab.css";
 
 export function LaunchTab() {
   const state = useLaunchStore((s) => s);
   const launches = getActiveLaunches(state);
+  const globeMode = useLaunchStore((s) => s.globeMode);
+
 
   const selectLaunch = useLaunchStore((s) => s.selectLaunch);
   const pushSidebarView = useLaunchStore((s) => s.pushSidebarView);
@@ -80,14 +82,18 @@ export function LaunchTab() {
         </div>
 
         {/* TIMELINE TOGGLE */}
-        <div className="timeline-toggle">
-          <button
-            className={`timeline-toggle-btn ${timelineEnabled ? "active" : ""}`}
-            onClick={() => setTimelineEnabled(!timelineEnabled)}
-          >
-            {timelineEnabled ? "Timeline: On" : "Timeline: Off"}
-          </button>
-        </div>
+        {globeMode === "launches" && launchTab === "previous" && (
+          <div className="timeline-toggle">
+            <button
+              className={`timeline-toggle-btn ${
+                timelineEnabled ? "active" : ""
+              }`}
+              onClick={() => setTimelineEnabled(!timelineEnabled)}
+            >
+              {timelineEnabled ? "Timeline: On" : "Timeline: Off"}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="launches-list">

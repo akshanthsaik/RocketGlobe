@@ -1,7 +1,7 @@
 // src/components/Sidebar/cards/PadCard.tsx
 import { Pad } from "../../../lib/api";
 import { getCountryFlag } from "../../../lib/utils";
-import "./PadCard.css";
+import "./Card.css";
 
 interface PadCardProps {
   pad: Pad;

@@ -5,7 +5,6 @@ import { formatDateShort } from "../../lib/utils";
 import "./Timeline.css";
 
 export function Timeline() {
-  // ✅ CORRECT: Individual selectors
   const timelineDate = useLaunchStore((state) => state.timelineDate);
   const isTimelinePlaying = useLaunchStore((state) => state.isTimelinePlaying);
   const timelineSpeed = useLaunchStore((state) => state.timelineSpeed);
@@ -40,7 +39,7 @@ export function Timeline() {
     }
 
     const [startDate, endDate] = timelineRange;
-    const daysPerSecond = timelineSpeed * 30;
+    const daysPerSecond = timelineSpeed * 10;
     const msPerFrame = (daysPerSecond * 24 * 60 * 60 * 1000) / 60;
 
     let lastTime = Date.now();

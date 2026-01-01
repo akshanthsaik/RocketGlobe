@@ -1,97 +1,153 @@
-text
+# RocketGlobe
 
-# Rocket Globe
+RocketGlobe is a desktop-first, 3D globe-based visualization system for global rocket launches, implemented as a Tauri application with a React frontend, CesiumJS for globe rendering, and a Python backend integrated with PostgreSQL/PostGIS. The application synchronizes launch, pad, rocket, and agency data from TheSpaceDevs Launch Library 2 API and provides interactive exploration through multiple visualization modes, a timeline, and a responsive, dark, glassmorphic UI.
 
-A desktop application for visualizing rocket launches in 3D with real satellite imagery and geospatial data.
+## Features
 
-## Tech Stack
+- **3D Globe Visualization**: Interactive 3D Earth rendered with CesiumJS, showing launch pads and launches with geospatial accuracy.
+- **Four Visualization Modes**:
+  - **Launches**: Filter and view launches over time with a timeline.
+  - **Pads**: Explore launch sites and their activity.
+  - **Rockets**: Analyze launches by vehicle.
+  - **Agencies**: Track launches by agency.
+- **Responsive UI**: Dark, glassmorphic design with a fixed header, resizable sidebar, and timeline, fully responsive from desktop to tablet.
+- **Backend Integration**: Synchronizes launch, pad, rocket, and agency data from TheSpaceDevs Launch Library 2 into a PostgreSQL/PostGIS database for fast querying and visualization.
+- **Manual Refresh**: Trigger backend sync to update data without reloading the app.
 
-### Frontend
+## Architecture
 
-- **Tauri 2** - Desktop shell
-- **React 19** - UI framework
-- **Cesium.js** - 3D geospatial visualization
-- **TypeScript** - Type safety
-- **Vite** - Build tool
-- **Bun** - Package manager
+### Tauri Application
+
+- **Frontend**: React + TypeScript, integrated with Tauri for desktop deployment.
+- **Backend**: Python (FastAPI or Flask) serving launch, pad, rocket, and agency data.
+- **Database**: PostgreSQL/PostGIS for structured and geospatial storage.
+- **Data Sync**: Scheduled or manual sync from TheSpaceDevs Launch Library 2 API, normalizing and storing data for local querying.
+
+### Data Model
+
+#### Launches Table
+
+| Column       | Type      | Description                              |
+| ------------ | --------- | ---------------------------------------- |
+| id           | SERIAL    | Unique identifier                        |
+| name         | VARCHAR   | Launch name                              |
+| status       | VARCHAR   | Launch status (success/failure/upcoming) |
+| net          | TIMESTAMP | Launch date/time                         |
+| window_start | TIMESTAMP | Launch window start                      |
+| window_end   | TIMESTAMP | Launch window end                        |
+| mission_type | VARCHAR   | Mission type (LEO, GTO, etc.)            |
+| orbit        | VARCHAR   | Orbit type                               |
+| image_url    | VARCHAR   | URL to launch image/patch                |
+| pad_id       | INTEGER   | Foreign key to pads table                |
+| rocket_id    | INTEGER   | Foreign key to rockets table             |
+| agency_id    | INTEGER   | Foreign key to agencies table            |
+
+#### Pads Table
+
+| Column             | Type     | Description                                 |
+| ------------------ | -------- | ------------------------------------------- |
+| id                 | SERIAL   | Unique identifier                           |
+| name               | VARCHAR  | Pad name                                    |
+| latitude           | DOUBLE   | Pad latitude                                |
+| longitude          | DOUBLE   | Pad longitude                               |
+| location           | GEOMETRY | PostGIS geometry column for spatial queries |
+| total_launch_count | INTEGER  | Total number of launches from this pad      |
+| country_code       | VARCHAR  | Country code                                |
+| agency_id          | INTEGER  | Foreign key to agencies table               |
+
+#### Rockets Table
+
+| Column          | Type    | Description                              |
+| --------------- | ------- | ---------------------------------------- |
+| id              | SERIAL  | Unique identifier                        |
+| name            | VARCHAR | Rocket name                              |
+| family          | VARCHAR | Rocket family (e.g., Falcon 9, Ariane 5) |
+| manufacturer_id | INTEGER | Foreign key to agencies table            |
+
+#### Agencies Table
+
+| Column      | Type    | Description                         |
+| ----------- | ------- | ----------------------------------- |
+| id          | SERIAL  | Unique identifier                   |
+| name        | VARCHAR | Agency name                         |
+| type        | VARCHAR | Agency type (government/commercial) |
+| country     | VARCHAR | Founding country                    |
+| description | TEXT    | Agency description                  |
+
+## Implementation Details
 
 ### Backend
 
-- **FastAPI** - Python API framework
-- **PostgreSQL + PostGIS** - Geospatial database
-- **SQLAlchemy** - ORM
-- **Temporal.io** - Workflow orchestration (planned)
-- **Launch Library 2** - Launch data source
+- **API Endpoints**:
+  - `/api/launches`: List all launches with filters.
+  - `/api/pads`: List all pads with filters.
+  - `/api/rockets`: List all rockets with filters.
+  - `/api/agencies`: List all agencies with filters.
+- **Data Sync**:
+  - Scheduled or manual sync from TheSpaceDevs Launch Library 2 API.
+  - Data is normalized and stored in PostgreSQL/PostGIS tables.
+  - Geospatial queries are optimized using PostGIS.
 
-## Project Structure
+### Frontend
 
-```
-rocketglobe/
-├── src/ # React frontend
-│ ├── scenes/ # Cesium 3D scenes
-│ ├── components/ # React components
-│ └── App.tsx
-├── src-tauri/ # Rust desktop app
-├── backend/ # Python FastAPI backend
-│ ├── app/
-│ │ ├── api/ # API endpoints
-│ │ ├── models/ # Database models
-│ │ ├── services/ # Business logic
-│ │ └── workers/ # Background tasks
-│ └── requirements.txt
-└── public/ # Static assets
-```
+- **React Components**:
+  - **Header**: Fixed at the top, shows application branding, mode selection, and manual refresh button.
+  - **Timeline**: Only active in Launches mode, allows filtering launches by time window.
+  - **Sidebar**: Acts as a list/detail panel, resizable, with draggable handle.
+  - **Cards**: Glassmorphic cards for launches, pads, rockets, and agencies.
+  - **Detail Views**: Rich context for selected items, with associated stats and relationships.
+- **Cesium Integration**:
+  - CesiumJS for rendering the globe, terrain, and camera controls.
+  - React handles state management and wiring of UI events to globe updates.
+  - Default Cesium UI elements are selectively hidden or restyled to match the dark theme.
 
-## Setup
+### Tauri Integration
 
-### Prerequisites
+- **Frontend**: React + TypeScript, integrated with Tauri for desktop deployment.
+- **Backend**: Python (FastAPI or Flask) running as a local service, accessed via Tauri’s API.
+- **Database**: PostgreSQL/PostGIS running locally, managed by the backend.
+- **Data Sync**: Python backend synchronizes data from TheSpaceDevs Launch Library 2 API and stores it in PostgreSQL/PostGIS.
+- **UI**: React frontend communicates with the Python backend via Tauri’s API, rendering data in CesiumJS.
 
-- Node.js 18+
-- Bun
-- Rust
-- Python 3.11+
-- PostgreSQL 16+
+## Installation
 
-### Frontend Setup
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/rocketglobe.git
 
-```
-bun install
-bun run tauri dev
-```
+# Install dependencies
+cd rocketglobe
+npm install
 
-### Backend Setup
-
-```
+# Start the backend
 cd backend
-python -m venv venv
-venv\Scripts\activate # Windows
-pip install -r requirements.txt
-uvicorn app.main:app --reload
+python app.py
+
+# Start the frontend
+cd ../frontend
+npm run dev
+
+# Build and run the Tauri application
+npm run tauri build
+npm run tauri dev
 ```
 
-### Database Setup
+## Usage
 
-```
-CREATE DATABASE rocketglobe;
-\c rocketglobe
-CREATE EXTENSION postgis;
-```
+- Use the header to switch visualization modes.
+- In Launches mode, use the timeline to filter launches by time.
+- Click on markers or list items to view details.
+- Resize the sidebar for optimal viewing.
+- Use the refresh button to sync with the latest data.
 
-## Development
+## Technologies
 
-- Frontend dev server: `bun run tauri dev`
-- Backend dev server: `uvicorn app.main:app --reload`
-- API docs: http://localhost:8000/docs
-
-## Environment Variables
-
-
-Create `backend/.env`:
-```
-DATABASE_URL=postgresql://postgres:password@localhost:5432/rocketglobe
-LL2_BASE_URL=https://ll.thespacedevs.com/2.2.0
-```
+- **Frontend**: React, TypeScript, CesiumJS, CSS (glassmorphic design)
+- **Backend**: Python, PostgreSQL, PostGIS, TheSpaceDevs Launch Library 2 API
+- **Desktop Integration**: Tauri
 
 ## License
 
 MIT
+
+---

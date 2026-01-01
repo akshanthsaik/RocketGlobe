@@ -1,6 +1,6 @@
 // src/components/Sidebar/cards/RocketCard.tsx
 import { Rocket } from "../../../lib/api";
-import "./RocketCard.css";
+import "./Card.css";
 
 interface RocketCardProps {
   rocket: Rocket;

@@ -1,7 +1,7 @@
 // src/components/Sidebar/tabs/RocketsTab.tsx
 import { useMemo, useState } from "react";
 import { useLaunchStore } from "../../../store/launchStore";
-import "./RocketsTab.css";
+import "./Tab.css";
 
 export function RocketsTab() {
   const rockets = useLaunchStore((state) => state.rockets);

@@ -7,7 +7,7 @@ import {
   formatCoordinates,
   getCountryFlag,
 } from "../../../lib/utils";
-import "./LaunchDetailView.css";
+import "./View.css";
 
 interface LaunchDetailViewProps {
   launch: Launch;

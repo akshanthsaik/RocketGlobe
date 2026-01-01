@@ -325,11 +325,22 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
   },
 
   popSidebarView: () => {
-    const stack = get().sidebarViewStack;
+    const state = get();
+    const stack = state.sidebarViewStack;
+
     if (stack.length > 1) {
       set({ sidebarViewStack: stack.slice(0, -1) });
+    } else {
+      let firstView: ViewType = "launch-list";
+      if (state.globeMode === "pads") firstView = "pad-detail";
+      else if (state.globeMode === "rockets") firstView = "rocket-detail";
+      else if (state.globeMode === "agencies") firstView = "agency-detail";
+
+      set({ sidebarViewStack: [{ type: firstView }] });
     }
   },
+
+
 
   resetSidebarView: () => {
     const globeMode = get().globeMode;

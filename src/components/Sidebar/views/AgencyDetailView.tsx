@@ -4,7 +4,7 @@ import { useLaunchStore } from "../../../store/launchStore";
 import { Agency } from "../../../lib/api";
 import { getCountryFlag } from "../../../lib/utils";
 import { LaunchCard } from "../cards/LaunchCard";
-import "./AgencyDetailView.css";
+import "./View.css";
 
 interface AgencyDetailViewProps {
   agency: Agency;

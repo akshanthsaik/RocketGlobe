@@ -1,7 +1,7 @@
 // src/components/Sidebar/cards/LaunchCard.tsx
 import { Launch } from "../../../lib/api";
 import { formatDate, getStatusColor } from "../../../lib/utils";
-import "./LaunchCard.css";
+import "./Card.css";
 
 interface LaunchCardProps {
   launch: Launch;
@@ -24,5 +24,6 @@ export function LaunchCard({ launch, onClick }: LaunchCardProps) {
         <div className="launch-card-date">{formatDate(launch.net)}</div>
       )}
     </div>
+    
   );
 }

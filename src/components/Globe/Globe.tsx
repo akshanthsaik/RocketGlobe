@@ -10,6 +10,7 @@ import {
 } from "../../store/launchStore";
 import "./Globe.css";
 import { Legend } from "./Legend";
+import { PadInsetView } from "./PadInsetView";
 
 Cesium.Ion.defaultAccessToken =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJqdGkiOiI5ZTAwNzk4ZS0zYzUwLTQzMzItYmYzNi1iOWIyZjU1ODg3ZmEiLCJpZCI6MzY3ODk4LCJpYXQiOjE3NjUyNjA2OTl9.NKrR0XhbDD_R8dyteyC6srb_Bxi4BHEMOib7O5CHa0s";
@@ -18,6 +19,9 @@ export function Globe() {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
   const handlerRef = useRef<Cesium.ScreenSpaceEventHandler | null>(null);
+  const countriesRef = useRef<Cesium.GeoJsonDataSource | null>(null);
+  const cameraFlyToRef = useRef<boolean>(false);
+  const lastTimelineDateRef = useRef<Date | null>(null);
 
   const [isReady, setIsReady] = useState(false);
   const [viewerReady, setViewerReady] = useState(false);
@@ -46,17 +50,20 @@ export function Globe() {
   const agencyFilter = useLaunchStore((s) => s.agencyFilter);
   const rocketFilter = useLaunchStore((s) => s.rocketFilter);
 
-  // Pads to render for each mode
+  // Compute pads to show based on mode and filters
   const padsToShow = useMemo(() => {
     const state = useLaunchStore.getState();
 
     if (globeMode === "launches") {
-      const launchesForPads = timelineEnabled
-        ? getTimelineLaunchesForGlobe(state)
-        : getActiveLaunches(state);
+      // WHEN TIMELINE IS ENABLED: Show all pads (they'll be colored based on activity)
+      if (timelineEnabled) {
+        return pads;
+      }
 
+      // WHEN TIMELINE IS DISABLED: Show only pads with active launches (original behavior)
+      const launchesForPads = getActiveLaunches(state);
       const padIds = new Set(
-        launchesForPads.map((l) => l.pad_id).filter((id): id is number => !!id),
+        launchesForPads.map((l) => l.pad_id).filter((id): id is number => !!id)
       );
       return pads.filter((p) => padIds.has(p.id));
     }
@@ -66,7 +73,7 @@ export function Globe() {
     if (globeMode === "rockets" && selectedRocket) {
       const rocketLaunches = getLaunchesForRocket(launches, selectedRocket.id);
       const padIds = new Set(
-        rocketLaunches.map((l) => l.pad_id).filter((id): id is number => !!id),
+        rocketLaunches.map((l) => l.pad_id).filter((id): id is number => !!id)
       );
       return pads.filter((p) => padIds.has(p.id));
     }
@@ -74,7 +81,7 @@ export function Globe() {
     if (globeMode === "agencies" && selectedAgency) {
       const agencyLaunches = getLaunchesForAgency(launches, selectedAgency.id);
       const padIds = new Set(
-        agencyLaunches.map((l) => l.pad_id).filter((id): id is number => !!id),
+        agencyLaunches.map((l) => l.pad_id).filter((id): id is number => !!id)
       );
       return pads.filter((p) => padIds.has(p.id));
     }
@@ -94,7 +101,7 @@ export function Globe() {
     rocketFilter,
   ]);
 
-  // Container ready
+  // Check if container is ready
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -113,7 +120,7 @@ export function Globe() {
     return () => clearTimeout(timer);
   }, []);
 
-  // Initialize Cesium
+  // Initialize Cesium viewer
   useEffect(() => {
     if (!isReady || !containerRef.current || viewerRef.current) return;
 
@@ -142,7 +149,7 @@ export function Globe() {
         });
 
         viewer.imageryLayers.removeAll();
-        const imageryProvider = await Cesium.IonImageryProvider.fromAssetId(2);
+        const imageryProvider = await Cesium.IonImageryProvider.fromAssetId(3); 
         viewer.imageryLayers.addImageryProvider(imageryProvider);
 
         viewer.scene.globe.enableLighting = false;
@@ -153,7 +160,45 @@ export function Globe() {
           destination: Cesium.Cartesian3.fromDegrees(0, 30, 20000000),
         });
 
-        // Click handler
+        // Load countries GeoJSON for agency mode
+        try {
+          const countries = await Cesium.GeoJsonDataSource.load(
+            "https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson",
+            {
+              stroke: Cesium.Color.TRANSPARENT,
+              fill: Cesium.Color.TRANSPARENT,
+              clampToGround: true,
+              markerColor: Cesium.Color.TRANSPARENT,
+            }
+          );
+
+          // Process each entity safely
+          countries.entities.values.forEach((entity) => {
+            // Only process if it's actually a polygon
+            if (entity.polygon) {
+              try {
+                entity.polygon.material = new Cesium.ColorMaterialProperty(
+                  Cesium.Color.TRANSPARENT
+                );
+                entity.polygon.outline = new Cesium.ConstantProperty(false);
+                entity.polygon.height = new Cesium.ConstantProperty(0);
+                entity.polygon.extrudedHeight = new Cesium.ConstantProperty(0);
+              } catch (e) {
+                console.warn("Failed to configure entity:", entity.name, e);
+              }
+            }
+          });
+
+          await viewer.dataSources.add(countries);
+          countriesRef.current = countries;
+          console.log("✅ Countries loaded:", countries.entities.values.length);
+        } catch (error) {
+          console.warn("Failed to load countries GeoJSON:", error);
+          countriesRef.current = null;
+        }
+
+
+        // Click handler for pads, agencies, and countries
         handler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
         handler.setInputAction((movement: any) => {
           const pickedObject = viewer!.scene.pick(movement.position);
@@ -167,7 +212,7 @@ export function Globe() {
                 useLaunchStore.getState().navigateToPad(padId);
 
                 const position = entity.position?.getValue(
-                  Cesium.JulianDate.now(),
+                  Cesium.JulianDate.now()
                 );
                 if (position) {
                   const cartographic =
@@ -176,7 +221,7 @@ export function Globe() {
                     destination: Cesium.Cartesian3.fromRadians(
                       cartographic.longitude,
                       cartographic.latitude,
-                      500000,
+                      50000
                     ),
                     duration: 2,
                   });
@@ -187,6 +232,13 @@ export function Globe() {
               if (agencyId) {
                 useLaunchStore.getState().navigateToAgency(agencyId);
               }
+            } else if (entity.properties?.agencyCount) {
+              // Clicked on a country with agencies
+              const countryName = entity.properties?.ADMIN?.getValue() || "Unknown";
+              const agencyCount = entity.properties?.agencyCount?.getValue();
+              console.log(`${countryName}: ${agencyCount} agencies`);
+              
+              // Optional: You can add a toast notification or sidebar update here
             }
           }
         }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
@@ -211,19 +263,86 @@ export function Globe() {
         viewer.destroy();
         viewerRef.current = null;
       }
+      countriesRef.current = null;
       setViewerReady(false);
     };
   }, [isReady]);
 
-  // Render entities
+  // Render entities (optimized to only update when necessary)
   useEffect(() => {
     if (!viewerReady || !viewerRef.current || isLoading) return;
     const viewer = viewerRef.current;
+
+    // Clear all entities
     viewer.entities.removeAll();
 
     if (globeMode === "agencies") {
+      // Highlight countries with agencies
+      if (countriesRef.current) {
+        const counts = getAgencyCountsByCountry(agencies);
+
+        countriesRef.current.entities.values.forEach((entity) => {
+          if (!entity.polygon) return;
+
+          try {
+            const iso2 = entity.properties?.ISO_A2?.getValue();
+            
+            if (!iso2) return;
+
+            const count = counts.get(iso2);
+
+            if (count && count > 0) {
+              // Color based on number of agencies
+              let color = Cesium.Color.BLUE.withAlpha(0.3);
+              if (count > 10) color = Cesium.Color.PURPLE.withAlpha(0.5);
+              else if (count > 5) color = Cesium.Color.CYAN.withAlpha(0.4);
+              else if (count > 2) color = Cesium.Color.BLUE.withAlpha(0.35);
+
+              entity.polygon.material = new Cesium.ColorMaterialProperty(color);
+              entity.polygon.outline = new Cesium.ConstantProperty(true);
+              entity.polygon.outlineColor = new Cesium.ConstantProperty(
+                Cesium.Color.WHITE.withAlpha(0.6)
+              );
+              entity.polygon.outlineWidth = new Cesium.ConstantProperty(1);
+
+              // Store count for click handler
+              if (!entity.properties) {
+                entity.properties = new Cesium.PropertyBag();
+              }
+              
+              if (!entity.properties.hasProperty("agencyCount")) {
+                entity.properties.addProperty("agencyCount", count);
+              } else {
+                entity.properties.agencyCount = count;
+              }
+            } else {
+              // Hide countries with no agencies
+              entity.polygon.material = new Cesium.ColorMaterialProperty(
+                Cesium.Color.TRANSPARENT
+              );
+              entity.polygon.outline = new Cesium.ConstantProperty(false);
+            }
+          } catch (e) {
+            console.warn("Failed to update country entity:", entity.name, e);
+          }
+        });
+      }
+
+
+      // Render agency markers on top
       renderAgencies(viewer, agencies);
       return;
+    } else {
+      // Hide country highlights in other modes
+      if (countriesRef.current) {
+        countriesRef.current.entities.values.forEach((entity) => {
+          if (entity.polygon) {
+            entity.polygon.material = new Cesium.ColorMaterialProperty(
+              Cesium.Color.TRANSPARENT
+            );
+          }
+        });
+      }
     }
 
     const state = useLaunchStore.getState();
@@ -232,7 +351,7 @@ export function Globe() {
         ? timelineEnabled
           ? getTimelineLaunchesForGlobe(state)
           : getActiveLaunches(state)
-        : launches; // rockets/pads/agencies modes
+        : launches;
 
     const effectiveTimelineDate =
       globeMode === "launches" && timelineEnabled ? timelineDate : null;
@@ -249,7 +368,7 @@ export function Globe() {
     timelineEnabled,
   ]);
 
-  // Camera follow while timeline playing (launches mode only)
+  // Camera follow during timeline playback (debounced)
   useEffect(() => {
     if (
       !viewerRef.current ||
@@ -260,6 +379,17 @@ export function Globe() {
     ) {
       return;
     }
+
+    // Debounce: only fly if timeline date changed significantly
+    if (
+      lastTimelineDateRef.current &&
+      Math.abs(timelineDate.getTime() - lastTimelineDateRef.current.getTime()) <
+        2000
+    ) {
+      return;
+    }
+
+    lastTimelineDateRef.current = timelineDate;
 
     const state = useLaunchStore.getState();
     const timelineLaunches = getTimelineLaunchesForGlobe(state);
@@ -272,13 +402,24 @@ export function Globe() {
     if (!pad) return;
 
     const viewer = viewerRef.current;
+
+    // Prevent multiple simultaneous flyTos
+    if (cameraFlyToRef.current) return;
+    cameraFlyToRef.current = true;
+
     viewer.camera.flyTo({
       destination: Cesium.Cartesian3.fromDegrees(
         pad.longitude,
         pad.latitude,
-        500000,
+        75000 // Closer zoom for timeline mode
       ),
       duration: 1.5,
+      complete: () => {
+        cameraFlyToRef.current = false;
+      },
+      cancel: () => {
+        cameraFlyToRef.current = false;
+      },
     });
   }, [timelineDate, timelineEnabled, isTimelinePlaying, globeMode, pads]);
 
@@ -308,7 +449,7 @@ export function Globe() {
       destination: Cesium.Cartesian3.fromDegrees(
         pad.longitude,
         pad.latitude,
-        500000,
+        50000 // Close zoom for selected launch
       ),
       duration: 2,
     });
@@ -325,23 +466,54 @@ export function Globe() {
     <div className={`globe-container ${!sidebarOpen ? "sidebar-closed" : ""}`}>
       <div ref={containerRef} className="cesium-viewer" />
       <Legend mode={globeMode} />
+
+      {/* Inset close-up view */}
+      {selectedLaunch && (
+        <PadInsetView
+          pad={pads.find((p) => p.id === selectedLaunch.pad_id)}
+          launch={selectedLaunch}
+        />
+      )}
+
       {!viewerReady && (
         <div className="globe-loading-overlay">
           <div className="loading-spinner" />
-          <div>Initializing globe...</div>
+          <div className="loading-text">Initializing globe...</div>
         </div>
       )}
     </div>
   );
 }
 
+// ===== HELPER FUNCTIONS =====
+
+/**
+ * Build a map of country code -> agency count
+ */
+function getAgencyCountsByCountry(agencies: any[]): Map<string, number> {
+  const map = new Map<string, number>();
+
+  agencies.forEach((a) => {
+    if (!a.country_code || a.country_code === "???") return;
+    
+    // Use ISO 2-letter code (e.g., "US", "IN", "FR")
+    const countryCode = a.country_code.toUpperCase();
+    map.set(countryCode, (map.get(countryCode) || 0) + 1);
+  });
+
+  return map;
+}
+
 // ===== RENDERING FUNCTIONS =====
 
+/**
+ * Render launch pads on the globe with color coding based on launch count
+ */
 function renderPads(
   viewer: Cesium.Viewer,
   pads: any[],
   launches: any[],
-  timelineDate: Date | null,
+  timelineDate: Date | null
 ) {
   pads.forEach((pad) => {
     const padLaunches = launches.filter((l: any) => l.pad_id === pad.id);
@@ -352,21 +524,39 @@ function renderPads(
 
     const launchCount = filteredLaunches.length;
 
-    let color = Cesium.Color.GRAY;
-    if (launchCount > 100) color = Cesium.Color.LIME;
-    else if (launchCount > 50) color = Cesium.Color.YELLOW;
-    else if (launchCount > 20) color = Cesium.Color.ORANGE;
-    else if (launchCount > 0) color = Cesium.Color.CYAN;
+    // Color coding based on launch count
+    let color = Cesium.Color.GRAY.withAlpha(0.4); // Dimmed for inactive
+    if (launchCount > 100) color = Cesium.Color.LIME.withAlpha(0.95);
+    else if (launchCount > 50) color = Cesium.Color.YELLOW.withAlpha(0.95);
+    else if (launchCount > 20) color = Cesium.Color.ORANGE.withAlpha(0.95);
+    else if (launchCount > 0) color = Cesium.Color.CYAN.withAlpha(0.9);
+
+    // Calculate pixel size based on launch count
+    const baseSize = 8; // Smaller base for inactive pads
+    const activeBaseSize = 12;
+    const maxSize = 22;
+
+    const pixelSize =
+      launchCount > 0
+        ? Math.min(activeBaseSize + launchCount / 15, maxSize)
+        : baseSize;
+
+    // Outline is more prominent for active pads
+    const outlineWidth = launchCount > 0 ? 2 : 1;
+    const outlineColor =
+      launchCount > 0
+        ? Cesium.Color.WHITE.withAlpha(0.9)
+        : Cesium.Color.WHITE.withAlpha(0.4);
 
     viewer.entities.add({
       id: `pad-${pad.id}`,
       name: pad.name,
       position: Cesium.Cartesian3.fromDegrees(pad.longitude, pad.latitude),
       point: {
-        pixelSize: 12,
+        pixelSize,
         color,
-        outlineColor: Cesium.Color.WHITE,
-        outlineWidth: 2,
+        outlineColor,
+        outlineWidth
       },
       properties: {
         type: "pad",
@@ -378,9 +568,12 @@ function renderPads(
   });
 }
 
+/**
+ * Render agencies on the globe with labels
+ */
 function renderAgencies(viewer: Cesium.Viewer, agencies: any[]) {
   const agenciesWithCoords = agencies.filter(
-    (a: any) => a.latitude && a.longitude,
+    (a: any) => a.latitude && a.longitude
   );
 
   agenciesWithCoords.forEach((agency: any) => {
@@ -389,17 +582,17 @@ function renderAgencies(viewer: Cesium.Viewer, agencies: any[]) {
       name: agency.name,
       position: Cesium.Cartesian3.fromDegrees(
         agency.longitude,
-        agency.latitude,
+        agency.latitude
       ),
       point: {
         pixelSize: 16,
-        color: Cesium.Color.fromCssColorString("#3b82f6"),
-        outlineColor: Cesium.Color.WHITE,
+        color: Cesium.Color.fromCssColorString("#3b82f6").withAlpha(0.9),
+        outlineColor: Cesium.Color.WHITE.withAlpha(0.9),
         outlineWidth: 3,
       },
       label: {
         text: agency.abbrev || agency.name,
-        font: "14px sans-serif",
+        font: "14px 'Inter', sans-serif",
         fillColor: Cesium.Color.WHITE,
         outlineColor: Cesium.Color.BLACK,
         outlineWidth: 3,

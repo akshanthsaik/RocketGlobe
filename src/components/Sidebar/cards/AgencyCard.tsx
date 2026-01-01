@@ -1,7 +1,7 @@
 // src/components/Sidebar/cards/AgencyCard.tsx
 import { Agency } from "../../../lib/api";
 import { getCountryFlag } from "../../../lib/utils";
-import "./AgencyCard.css";
+import "./Card.css";
 
 interface AgencyCardProps {
   agency: Agency;

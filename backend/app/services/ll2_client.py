@@ -13,7 +13,7 @@ class LL2Client:
     Launch Library 2 API client with rate limiting and retry logic.
     """
     
-    def __init__(self, base_url: str = "https://lldev.thespacedevs.com/2.3.0"):
+    def __init__(self, base_url: str = "https://ll.thespacedevs.com/2.3.0"):
         self.base_url = base_url
         self.client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
         self._last_request_time = 0
@@ -33,7 +33,7 @@ class LL2Client:
         self,
         endpoint: str,
         params: Optional[Dict[str, Any]] = None,
-        retries: int = 3
+        retries: int = 40
     ) -> Dict[str, Any]:
         """Make rate-limited request with retry logic."""
         await self._rate_limit()
@@ -81,7 +81,7 @@ class LL2Client:
     
     async def get_agencies(
         self,
-        limit: int = 100,
+        limit: int = 1000,
         offset: int = 0
     ) -> Dict[str, Any]:
         """Fetch agencies from LL2."""
@@ -89,7 +89,7 @@ class LL2Client:
     
     async def get_pads(
         self,
-        limit: int = 100,
+        limit: int = 1000,
         offset: int = 0
     ) -> Dict[str, Any]:
         """Fetch launch pads from LL2."""
@@ -97,7 +97,7 @@ class LL2Client:
     
     async def get_rockets(
         self,
-        limit: int = 100,
+        limit: int = 1000,
         offset: int = 0
     ) -> Dict[str, Any]:
         """Fetch rocket configurations from LL2."""
@@ -105,7 +105,7 @@ class LL2Client:
     
     async def get_launches(
         self,
-        limit: int = 100,
+        limit: int = 10000,
         offset: int = 0,
         net__gte: Optional[str] = None,
         net__lte: Optional[str] = None,

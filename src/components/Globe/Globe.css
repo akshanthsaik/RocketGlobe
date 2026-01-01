@@ -1,0 +1,161 @@
+/* =========================
+   GLOBE CONTAINER
+   ========================= */
+
+.globe-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  z-index: var(--z-globe);
+  background: var(--bg-space);
+  overflow: hidden;
+  transition: all var(--transition-base);
+}
+
+/* =========================
+   CESIUM VIEWER
+   ========================= */
+
+.globe-container .cesium-viewer {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.globe-container .cesium-viewer canvas {
+  width: 100% !important;
+  height: 100% !important;
+  cursor: grab;
+}
+
+.globe-container .cesium-viewer canvas:active {
+  cursor: grabbing;
+}
+
+/* =========================
+   HIDE CESIUM CREDITS
+   ========================= */
+
+.globe-container .cesium-viewer-bottom,
+.globe-container .cesium-credit-logoContainer,
+.globe-container .cesium-credit-textContainer {
+  display: none !important;
+}
+
+/* =========================
+   CESIUM UI OVERRIDES
+   ========================= */
+
+.globe-container .cesium-button {
+  background: rgba(10, 15, 26, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: rgba(255, 255, 255, 0.7) !important;
+  border-radius: 8px !important;
+  backdrop-filter: blur(10px) !important;
+  transition:
+    background-color 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+.globe-container .cesium-button:hover {
+  background: rgba(20, 27, 46, 0.95) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: rgba(255, 255, 255, 0.95) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+}
+
+.globe-container .cesium-button:active {
+  transform: translateY(0);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+.globe-container .cesium-viewer-toolbar {
+  background: transparent !important;
+  border: none !important;
+  top: 16px !important;
+  right: 16px !important;
+}
+
+/* =========================
+   LOADING OVERLAY
+   ========================= */
+
+.globe-loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-space);
+  z-index: 100;
+  gap: var(--space-4);
+}
+
+.loading-spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--accent-cyan);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+.loading-text {
+  font-size: var(--text-base);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* =========================
+   RESPONSIVE
+   ========================= */
+
+@media (max-width: 767px) {
+  .globe-container {
+    min-height: 0;
+  }
+
+  .globe-container .cesium-viewer-toolbar {
+    top: 8px !important;
+    right: 8px !important;
+  }
+
+  .globe-container .cesium-button {
+    padding: 8px !important;
+  }
+}
+
+/* =========================
+   PERFORMANCE OPTIMIZATIONS
+   ========================= */
+
+.globe-container .cesium-viewer canvas {
+  will-change: transform;
+  transform: translateZ(0);
+}
+
+/* Reduce motion for accessibility */
+@media (prefers-reduced-motion: reduce) {
+  .globe-container .cesium-button {
+    transition: none;
+  }
+
+  .loading-spinner {
+    animation: none;
+    border-top-color: var(--accent-cyan);
+  }
+}

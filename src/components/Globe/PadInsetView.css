@@ -1,0 +1,70 @@
+/* src/components/Globe/PadInsetView.css */
+
+.pad-inset-view {
+  position: absolute;
+  bottom: 80px;
+  right: 20px;
+  width: 280px;
+  height: 220px;
+  background: rgba(10, 15, 26, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+  z-index: var(--z-legend);
+  animation: slideIn 0.3s ease;
+}
+
+.inset-header {
+  padding: var(--space-3);
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.inset-title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+}
+
+.inset-subtitle {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.inset-viewer {
+  width: 100%;
+  height: calc(100% - 60px);
+}
+
+.inset-viewer .cesium-viewer-bottom,
+.inset-viewer .cesium-credit-logoContainer,
+.inset-viewer .cesium-credit-textContainer,
+.inset-viewer .cesium-viewer-toolbar {
+  display: none !important;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 767px) {
+  .pad-inset-view {
+    width: 200px;
+    height: 180px;
+    bottom: 60px;
+    right: 10px;
+  }
+}

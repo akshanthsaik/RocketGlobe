@@ -1,0 +1,218 @@
+/* =========================
+   SIDEBAR CONTAINER
+   ========================= */
+
+.sidebar {
+  position: relative;
+  z-index: var(--z-sidebar);
+  width: var(--sidebar-width);
+  height: 100%;
+  background: var(--bg-dark);
+  border-right: 1px solid var(--border-subtle);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  overflow: hidden;
+  transition: transform var(--transition-base);
+}
+
+/* =========================
+   SIDEBAR HEADER
+   ========================= */
+
+.sidebar-header {
+  flex-shrink: 0;
+  padding: var(--space-4);
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 64px;
+}
+
+.sidebar-back-btn,
+.sidebar-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.sidebar-back-btn:hover,
+.sidebar-close-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-card-hover);
+  border-color: var(--border-normal);
+}
+
+.sidebar-back-btn svg,
+.sidebar-close-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.sidebar-title {
+  flex: 1;
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sidebar-close-btn {
+  display: none;
+}
+
+/* =========================
+   SIDEBAR CONTENT
+   ========================= */
+
+.sidebar-content {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* Scoped scrollbar tweak */
+.sidebar-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+/* =========================
+   SIDEBAR FOOTER
+   ========================= */
+
+.sidebar-footer {
+  flex-shrink: 0;
+  padding: var(--space-4);
+  background: var(--bg-card);
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* =========================
+   MOBILE & RESPONSIVE
+   ========================= */
+
+/* Tablet */
+@media (max-width: 1023px) {
+  .sidebar {
+    width: var(--sidebar-width-tablet);
+  }
+
+  .sidebar-header {
+    padding: var(--space-3);
+  }
+
+  .sidebar-title {
+    font-size: var(--text-base);
+  }
+}
+
+/* Mobile Drawer */
+@media (max-width: 767px) {
+  .sidebar {
+    position: fixed;
+    top: var(--header-height-mobile);
+    left: 0;
+    bottom: 0;
+    width: 100%;
+    max-width: 100vw;
+    transform: translateX(-100%);
+    box-shadow: var(--shadow-xl);
+    background: var(--bg-dark);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  .sidebar-close-btn {
+    display: flex;
+  }
+
+  .sidebar-header {
+    min-height: 56px;
+  }
+
+  /* Backdrop */
+  .sidebar-backdrop {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(2px);
+    z-index: calc(var(--z-sidebar) - 1);
+    animation: fade-in var(--transition-fast);
+  }
+
+  .sidebar-backdrop.visible {
+    display: block;
+  }
+}
+
+/* Very small devices */
+@media (max-width: 374px) {
+  .sidebar-back-btn,
+  .sidebar-close-btn {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* =========================
+   RESIZE HANDLE
+   ========================= */
+
+.sidebar-resize-handle {
+  position: absolute;
+  right: -3px;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: ew-resize;
+  background: transparent;
+  z-index: 10;
+}
+
+.sidebar-resize-handle::before {
+  content: "";
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 2px;
+  height: 40px;
+  background: var(--border-normal);
+  border-radius: 4px;
+  opacity: 0;
+  transition:
+    opacity var(--transition-fast),
+    background-color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.sidebar-resize-handle:hover::before,
+.sidebar-resize-handle:active::before {
+  opacity: 1;
+}
+
+.sidebar-resize-handle:active::before {
+  background: var(--accent-cyan);
+  box-shadow: 0 0 8px var(--accent-cyan);
+}

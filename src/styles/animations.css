@@ -1,0 +1,192 @@
+/* =========================
+   KEYFRAME ANIMATIONS
+   ========================= */
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-up {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-down {
+  from {
+    transform: translateY(-12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes scale-in {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes shimmer {
+  from {
+    background-position: -400px 0;
+  }
+  to {
+    background-position: 400px 0;
+  }
+}
+
+/* =========================
+   ANIMATION UTILITIES
+   ========================= */
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+  will-change: transform;
+}
+
+.animate-pulse {
+  animation: pulse 2s ease-in-out infinite;
+  will-change: opacity;
+}
+
+.animate-fade-in {
+  animation: fade-in var(--transition-base) ease-out;
+  will-change: opacity;
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left var(--transition-base) ease-out;
+  will-change: transform, opacity;
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right var(--transition-base) ease-out;
+  will-change: transform, opacity;
+}
+
+.animate-slide-in-up {
+  animation: slide-in-up var(--transition-base) ease-out;
+  will-change: transform, opacity;
+}
+
+.animate-slide-in-down {
+  animation: slide-in-down var(--transition-base) ease-out;
+  will-change: transform, opacity;
+}
+
+.animate-scale-in {
+  animation: scale-in var(--transition-fast) ease-out;
+  will-change: transform, opacity;
+}
+
+.animate-shimmer {
+  animation: shimmer 1.5s linear infinite;
+  background-size: 800px 100%;
+}
+
+/* =========================
+   TRANSITION UTILITIES
+   ========================= */
+
+.transition-colors {
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.transition-transform {
+  transition: transform var(--transition-base);
+}
+
+.transition-opacity {
+  transition: opacity var(--transition-base);
+}
+
+/* =========================
+   ACCESSIBILITY
+   ========================= */
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-spin,
+  .animate-pulse,
+  .animate-fade-in,
+  .animate-slide-in-left,
+  .animate-slide-in-right,
+  .animate-slide-in-up,
+  .animate-slide-in-down,
+  .animate-scale-in,
+  .animate-shimmer {
+    animation: none !important;
+  }
+
+  .transition-colors,
+  .transition-transform,
+  .transition-opacity {
+    transition: none !important;
+  }
+}

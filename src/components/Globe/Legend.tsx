@@ -2,11 +2,11 @@
 import "./Legend.css";
 
 interface LegendProps {
-  mode: "pads" | "heatmap" | "trajectories" | "timeline" | "agencies";
+  mode: "launches" | "pads" | "rockets" | "agencies" | "heatmap" | "trajectories" | "timeline";
 }
 
 export function Legend({ mode }: LegendProps) {
-  if (mode === "heatmap" || mode === "agencies") return null;
+  if (mode === "heatmap" || mode === "agencies" || mode === "rockets") return null;
 
   return (
     <div className="globe-legend">

@@ -1,4 +1,5 @@
 // src/components/Layout/Header.tsx
+import { useState } from "react";
 import { useLaunchStore } from "../../store/launchStore";
 import {
   isUpcomingLaunch,
@@ -19,6 +20,8 @@ export function Header() {
   const fetchAllData = useLaunchStore((state) => state.fetchAllData);
   const isLoading = useLaunchStore((state) => state.isLoading);
 
+  const [isSyncing, setIsSyncing] = useState(false);
+
   // Calculate stats
   const upcomingCount = launches.filter(isUpcomingLaunch).length;
   const decidedCount = launches.filter(isDecidedLaunch).length;
@@ -26,6 +29,50 @@ export function Header() {
 
   const handleRefresh = () => {
     fetchAllData();
+  };
+
+  const handleSync = async () => {
+    try {
+      const response = await fetch("/admin/sync", { method: "POST" });
+
+      // If backend scheduled background sync, it returns 202 Accepted
+      if (response.status === 202 || response.status === 409) {
+        // 202: sync scheduled; 409: sync already running
+        setIsSyncing(true);
+
+        // Poll sync-status until backend reports the sync is finished
+        const pollInterval = 3000;
+        const poll = setInterval(async () => {
+          try {
+            const st = await fetch("/admin/sync-status");
+            if (!st.ok) {
+              throw new Error(`Status check failed: ${st.status}`);
+            }
+            const data = await st.json();
+
+            if (!data.is_sync_running) {
+              clearInterval(poll);
+              setIsSyncing(false);
+              await fetchAllData();
+              console.log("Full sync finished, data refreshed")
+            }
+          } catch (err) {
+            console.error("Failed to poll sync status:", err);
+            clearInterval(poll);
+            setIsSyncing(false);
+          }
+        }, pollInterval);
+
+      } else if (response.ok) {
+        // Older behavior: blocking sync completed in response
+        await fetchAllData();
+      } else {
+        console.error("Sync failed:", await response.text());
+      }
+    } catch (error) {
+      console.error("Sync failed:", error);
+      setIsSyncing(false);
+    }
   };
 
   return (
@@ -212,10 +259,34 @@ export function Header() {
           </div>
 
           <button
+            className={`sync-btn ${isSyncing ? "loading" : ""}`}
+            onClick={handleSync}
+            disabled={isSyncing}
+            aria-label="Start full sync from Launch Library 2 (background)"
+            title="Start full sync from Launch Library 2 (background) — may take 10+ minutes"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              className={isSyncing ? "spinning" : ""}
+            >
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+          </button>
+
+          <button
             className={`refresh-btn ${isLoading ? "loading" : ""}`}
             onClick={handleRefresh}
             disabled={isLoading}
-            aria-label="Refresh data"
+            aria-label="Refresh data (fast - refreshes from local DB)"
+            title="Refresh local data (fast)"
           >
             <svg
               width="18"
@@ -231,6 +302,10 @@ export function Header() {
               <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
             </svg>
           </button>
+
+          <div className="sync-status" aria-live="polite">
+            {isSyncing ? "Full sync running — this may take several minutes..." : null}
+          </div>
         </div>
       </div>
     </header>

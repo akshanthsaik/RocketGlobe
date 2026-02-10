@@ -16,8 +16,8 @@ async def get_launches(
     limit: int = Query(100, le=10000),
     status: Optional[str] = None,
     agency_id: Optional[int] = None,
-    start_date: Optional[str] = None,
-    end_date: Optional[str] = None,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
     db: Session = Depends(get_db)
 ):
     """Get list of launches with optional filters."""
@@ -42,16 +42,6 @@ async def get_launches(
     return launches
 
 
-@router.get("/{launch_id}", response_model=LaunchResponse)
-async def get_launch(launch_id: int, db: Session = Depends(get_db)):
-    """Get single launch by ID."""
-    launch = db.query(Launch).filter(Launch.id == launch_id).first()
-    if not launch:
-        from fastapi import HTTPException
-        raise HTTPException(status_code=404, detail="Launch not found")
-    return launch
-
-
 @router.get("/upcoming/", response_model=List[LaunchResponse])
 async def get_upcoming_launches(
     limit: int = Query(10, le=100),
@@ -63,3 +53,13 @@ async def get_upcoming_launches(
         Launch.net >= now
     ).order_by(Launch.net.asc()).limit(limit).all()
     return launches
+
+
+@router.get("/{launch_id}", response_model=LaunchResponse)
+async def get_launch(launch_id: int, db: Session = Depends(get_db)):
+    """Get single launch by ID."""
+    launch = db.query(Launch).filter(Launch.id == launch_id).first()
+    if not launch:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Launch not found")
+    return launch

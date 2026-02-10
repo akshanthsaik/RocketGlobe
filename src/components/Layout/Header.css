@@ -210,6 +210,45 @@
   color: var(--accent-yellow);
 }
 
+/* Sync */
+
+.sync-btn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border-normal);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.sync-btn:hover:not(:disabled) {
+  background: var(--bg-card-hover);
+  border-color: var(--accent-cyan);
+  color: var(--text-secondary);
+}
+
+.sync-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sync-btn .spinning {
+  animation: spin 1s linear infinite;
+}
+
+.sync-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
 /* Refresh */
 
 .refresh-btn {
@@ -229,6 +268,22 @@
     color var(--transition-fast);
 }
 
+/* Sync status message */
+.sync-status {
+  margin-left: var(--space-3);
+  color: var(--text-muted);
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  min-width: 220px;
+}
+
+@media (max-width: 768px) {
+  .sync-status {
+    display: none;
+  }
+}
+
 .refresh-btn:hover {
   background: var(--bg-card-hover);
   color: var(--text-secondary);
@@ -241,6 +296,11 @@
 .refresh-btn svg {
   width: 20px;
   height: 20px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 
 /* =========================

@@ -7,7 +7,8 @@ export function PadsTab() {
   const pads = useLaunchStore((state) => state.pads);
   const launches = useLaunchStore((state) => state.launches);
   const navigateToPad = useLaunchStore((state) => state.navigateToPad);
-  const [searchQuery, setSearchQuery] = useState("");
+  const searchQuery = useLaunchStore((state) => state.searchQuery);
+  const setSearchQuery = useLaunchStore((state) => state.setSearchQuery);
   const [sortBy, setSortBy] = useState<"name" | "launches">("launches");
 
   const sortedPads = useMemo(() => {

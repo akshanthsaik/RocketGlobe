@@ -138,7 +138,8 @@ npm run tauri dev
 - In Launches mode, use the timeline to filter launches by time.
 - Click on markers or list items to view details.
 - Resize the sidebar for optimal viewing.
-- Use the refresh button to sync with the latest data.
+- Use the **Refresh** button to quickly reload data from the local database (fast).
+- Use the **Sync** button to start a full background sync from Launch Library 2 (may take 10+ minutes); the app will automatically refresh when the sync completes.
 
 ## Technologies
 

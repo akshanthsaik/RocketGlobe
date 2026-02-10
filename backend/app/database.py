@@ -6,7 +6,7 @@ from app.models.base import Base
 # Create engine with PostGIS support
 engine = create_engine(
     settings.DATABASE_URL,
-    echo=True,  # Set to False in production
+    echo=settings.SQL_ECHO,
     pool_pre_ping=True,
     pool_size=10,
     max_overflow=20
@@ -26,4 +26,4 @@ def get_db():
 def init_db():
     """Initialize database tables"""
     Base.metadata.create_all(bind=engine)
-    print("✅ Database tables created")
+    print("Database tables created")

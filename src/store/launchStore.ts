@@ -9,6 +9,8 @@ import {
   LAUNCH_STATUS,
 } from "../lib/api";
 
+let inFlightFetchAllData: Promise<void> | null = null;
+
 export type Launch = APILaunch;
 export type Pad = APIPad;
 export type Agency = APIAgency;
@@ -56,6 +58,9 @@ interface LaunchStoreState {
 
   // Filters
   searchQuery: string;
+  padSearchQuery: string;
+  rocketSearchQuery: string;
+  agencySearchQuery: string;
   statusFilter: string | null;
   agencyFilter: number | null;
   rocketFilter: number | null;
@@ -97,6 +102,9 @@ interface LaunchStoreState {
 
   // Filters
   setSearchQuery: (query: string) => void;
+  setPadSearchQuery: (query: string) => void;
+  setRocketSearchQuery: (query: string) => void;
+  setAgencySearchQuery: (query: string) => void;
   setStatusFilter: (status: string | null) => void;
   setAgencyFilter: (agencyId: number | null) => void;
   setRocketFilter: (rocketId: number | null) => void;
@@ -301,6 +309,9 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
   timelineRange: null,
 
   searchQuery: "",
+  padSearchQuery: "",
+  rocketSearchQuery: "",
+  agencySearchQuery: "",
   statusFilter: null,
   agencyFilter: null,
   rocketFilter: null,
@@ -311,42 +322,84 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
   lastRefresh: null,
 
   fetchAllData: async () => {
-    set({ isLoading: true, error: null });
-
-    try {
-      const [launches, pads, agencies, rockets] = await Promise.all([
-        api.getLaunches({ limit: 10000 }),
-        api.getPads({ limit: 1000 }),
-        api.getAgencies({ limit: 1000 }),
-        api.getRockets({ limit: 1000 }),
-      ]);
-
-      const sortedLaunches = launches
-        .filter((l) => l.net)
-        .sort(
-          (a, b) => new Date(a.net!).getTime() - new Date(b.net!).getTime(),
-        );
-
-      const timelineRange: [Date, Date] | null =
-        sortedLaunches.length > 0
-          ? [new Date(sortedLaunches[0].net!), new Date()]
-          : null;
-
-      set({
-        launches,
-        pads,
-        agencies,
-        rockets,
-        timelineRange,
-        isLoading: false,
-        lastRefresh: new Date(),
-      });
-    } catch (error) {
-      set({
-        error: (error as Error).message || "Failed to fetch data",
-        isLoading: false,
-      });
+    if (inFlightFetchAllData) {
+      return inFlightFetchAllData;
     }
+
+    inFlightFetchAllData = (async () => {
+      set({ isLoading: true, error: null });
+
+      try {
+        const maxAttempts = 8;
+        const retryDelayMs = 1000;
+        let lastError: unknown = null;
+        let launches: Launch[] = [];
+        let pads: Pad[] = [];
+        let agencies: Agency[] = [];
+        let rockets: Rocket[] = [];
+
+        for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+          try {
+            [launches, pads, agencies, rockets] = await Promise.all([
+              api.getLaunches({ limit: 10000 }),
+              api.getPads({ limit: 1000 }),
+              api.getAgencies({ limit: 1000 }),
+              api.getRockets({ limit: 1000 }),
+            ]);
+            lastError = null;
+            break;
+          } catch (error) {
+            lastError = error;
+            const message = (error as Error)?.message?.toLowerCase() || "";
+            const retriable =
+              message.includes("failed to fetch") ||
+              message.includes("networkerror") ||
+              message.includes("econnrefused") ||
+              message.includes("api error 502") ||
+              message.includes("api error 503");
+
+            if (!retriable || attempt === maxAttempts) {
+              break;
+            }
+            await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+          }
+        }
+
+        if (lastError) {
+          throw lastError;
+        }
+
+        const sortedLaunches = launches
+          .filter((l) => l.net)
+          .sort(
+            (a, b) => new Date(a.net!).getTime() - new Date(b.net!).getTime(),
+          );
+
+        const timelineRange: [Date, Date] | null =
+          sortedLaunches.length > 0
+            ? [new Date(sortedLaunches[0].net!), new Date()]
+            : null;
+
+        set({
+          launches,
+          pads,
+          agencies,
+          rockets,
+          timelineRange,
+          isLoading: false,
+          lastRefresh: new Date(),
+        });
+      } catch (error) {
+        set({
+          error: (error as Error).message || "Failed to fetch data",
+          isLoading: false,
+        });
+      } finally {
+        inFlightFetchAllData = null;
+      }
+    })();
+
+    return inFlightFetchAllData;
   },
 
   setGlobeMode: (mode) => {
@@ -424,14 +477,14 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
   setLaunchTab: (tab) => set({ launchTab: tab }),
 
   selectLaunch: (launch) => {
-    set({ selectedLaunch: launch });
+    set({ selectedLaunch: launch, sidebarOpen: launch ? true : get().sidebarOpen });
     if (launch) {
       get().pushSidebarView({ type: "launch-detail", data: launch });
     }
   },
 
   selectPad: (pad) => {
-    set({ selectedPad: pad });
+    set({ selectedPad: pad, sidebarOpen: pad ? true : get().sidebarOpen });
     if (pad) {
       get().setGlobeMode("pads");
       get().pushSidebarView({ type: "pad-detail", data: pad });
@@ -439,7 +492,7 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
   },
 
   selectAgency: (agency) => {
-    set({ selectedAgency: agency });
+    set({ selectedAgency: agency, sidebarOpen: agency ? true : get().sidebarOpen });
     if (agency) {
       get().setGlobeMode("agencies");
       get().pushSidebarView({ type: "agency-detail", data: agency });
@@ -447,7 +500,7 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
   },
 
   selectRocket: (rocket) => {
-    set({ selectedRocket: rocket });
+    set({ selectedRocket: rocket, sidebarOpen: rocket ? true : get().sidebarOpen });
     if (rocket) {
       get().setGlobeMode("rockets");
       get().pushSidebarView({ type: "rocket-detail", data: rocket });
@@ -550,6 +603,9 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
   },
 
   setSearchQuery: (query) => set({ searchQuery: query }),
+  setPadSearchQuery: (query) => set({ padSearchQuery: query }),
+  setRocketSearchQuery: (query) => set({ rocketSearchQuery: query }),
+  setAgencySearchQuery: (query) => set({ agencySearchQuery: query }),
   setStatusFilter: (status) => set({ statusFilter: status }),
   setAgencyFilter: (agencyId) => set({ agencyFilter: agencyId }),
   setRocketFilter: (rocketId) => set({ rocketFilter: rocketId }),
@@ -558,6 +614,9 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
   clearFilters: () =>
     set({
       searchQuery: "",
+      padSearchQuery: "",
+      rocketSearchQuery: "",
+      agencySearchQuery: "",
       statusFilter: null,
       agencyFilter: null,
       rocketFilter: null,
@@ -568,7 +627,7 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
   navigateToPad: (padId) => {
     const pad = get().pads.find((p) => p.id === padId);
     if (pad) {
-      set({ selectedPad: pad });
+      set({ selectedPad: pad, sidebarOpen: true });
       get().pushSidebarView({ type: "pad-detail", data: pad });
     }
   },
@@ -576,7 +635,7 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
   navigateToRocket: (rocketId) => {
     const rocket = get().rockets.find((r) => r.id === rocketId);
     if (rocket) {
-      set({ selectedRocket: rocket });
+      set({ selectedRocket: rocket, sidebarOpen: true });
       get().pushSidebarView({ type: "rocket-detail", data: rocket });
     }
   },
@@ -584,7 +643,7 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
   navigateToAgency: (agencyId) => {
     const agency = get().agencies.find((a) => a.id === agencyId);
     if (agency) {
-      set({ selectedAgency: agency });
+      set({ selectedAgency: agency, sidebarOpen: true });
       get().pushSidebarView({ type: "agency-detail", data: agency });
     }
   },

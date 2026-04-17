@@ -9,7 +9,10 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "check": "tsc --noEmit",
-    "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\""
+    "release:windows": "powershell -ExecutionPolicy Bypass -File scripts/release-windows.ps1 -DatabaseUrl \"$env:DATABASE_URL\" -CesiumToken \"$env:VITE_CESIUM_ION_ACCESS_TOKEN\"",
+    "release:windows:local": "powershell -ExecutionPolicy Bypass -File scripts/release-windows.ps1",
+    "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\""
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

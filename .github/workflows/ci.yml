@@ -21,8 +21,8 @@ jobs:
       - name: Check TypeScript
         run: bun run check
 
-      - name: Lint frontend
-        run: bun run lint
+      - name: Format check
+        run: bun run format:check
 
       # Skip actual build for now (requires Rust + Tauri setup)
       # - name: Build
@@ -71,14 +71,12 @@ jobs:
       - name: Lint with Ruff
         run: |
           cd backend
-          ruff check . --fix
-        continue-on-error: true
+          ruff check .
 
       - name: Check imports and formatting
         run: |
           cd backend
           ruff format --check .
-        continue-on-error: true
 
       # Skip tests for now (need to write them)
       # - name: Run tests

@@ -5,16 +5,18 @@
   /* =========================
      SPACING SCALE
      ========================= */
-  --space-1: 0.25rem;   /* 4px */
-  --space-2: 0.5rem;    /* 8px */
-  --space-3: 0.75rem;   /* 12px */
-  --space-4: 1rem;      /* 16px */
-  --space-5: 1.25rem;   /* 20px */
-  --space-6: 1.5rem;    /* 24px */
-  --space-8: 2rem;      /* 32px */
-  --space-10: 2.5rem;   /* 40px */
-  --space-12: 3rem;     /* 48px */
-  --space-16: 4rem;     /* 64px */
+  --space-1: 0.25rem; /* 4px */
+  --space-1-5: 0.375rem; /* 6px */
+  --space-2: 0.5rem; /* 8px */
+  --space-2-5: 0.625rem; /* 10px */
+  --space-3: 0.75rem; /* 12px */
+  --space-4: 1rem; /* 16px */
+  --space-5: 1.25rem; /* 20px */
+  --space-6: 1.5rem; /* 24px */
+  --space-8: 2rem; /* 32px */
+  --space-10: 2.5rem; /* 40px */
+  --space-12: 3rem; /* 48px */
+  --space-16: 4rem; /* 64px */
 
   /* =========================
      BREAKPOINT TOKENS
@@ -34,6 +36,7 @@
   --sidebar-width-mobile: 100%;
   --timeline-height: 120px;
   --timeline-height-mobile: 140px;
+  --timeline-active-height: 0px;
   --legend-width: 200px;
 
   /* =========================
@@ -50,65 +53,82 @@
   --z-loading: 1000;
 
   /* =========================
-     COLORS — BACKGROUND
+     COLORS - BACKGROUND
      ========================= */
-  --bg-space: #0a0e1a;
-  --bg-dark: #111827;
-  --bg-card: #1f2937;
-  --bg-card-hover: #374151;
-  --bg-input: #1f2937;
-  --bg-overlay: rgba(10, 14, 26, 0.95);
+  --bg-space: #0a0c0f;
+  --bg-dark: #0e1115;
+  --bg-surface: #14181e;
+  --bg-elevated: rgba(20, 24, 30, 0.92);
+  --bg-card: rgba(20, 24, 30, 0.92);
+  --bg-card-hover: rgba(26, 31, 38, 0.96);
+  --bg-input: rgba(18, 22, 28, 0.94);
+  --bg-hover: rgba(26, 31, 38, 0.96);
+  --bg-overlay: rgba(7, 9, 12, 0.82);
 
   /* =========================
-     COLORS — TEXT
+     COLORS - TEXT
      ========================= */
-  --text-primary: #f9fafb;
-  --text-secondary: #9ca3af;
-  --text-muted: #6b7280;
-  --text-disabled: #4b5563;
+  --text-primary: #e5e9ef;
+  --text-secondary: #c3cad4;
+  --text-tertiary: #9aa4b1;
+  --text-muted: #7d8898;
+  --text-dim: #687484;
+  --text-disabled: #556171;
 
   /* =========================
-     COLORS — BORDERS
+     COLORS - BORDERS
      ========================= */
-  --border-subtle: #374151;
-  --border-normal: #4b5563;
-  --border-focus: #60a5fa;
+  --border-subtle: rgba(229, 234, 242, 0.08);
+  --border-normal: rgba(229, 234, 242, 0.15);
+  --border-bright: rgba(229, 234, 242, 0.22);
+  --border-focus: rgba(229, 234, 242, 0.3);
 
   /* =========================
      ACCENT COLORS
      ========================= */
-  --accent-blue: #60a5fa;
-  --accent-blue-bright: #3b82f6;
-  --accent-blue-dark: #2563eb;
-  --accent-green: #10b981;
-  --accent-yellow: #fbbf24;
-  --accent-orange: #f97316;
-  --accent-red: #ef4444;
-  --accent-purple: #a855f7;
-  --accent-cyan: #06b6d4;
-  --accent-lime: #84cc16;
+  --accent-blue: #c6ccd5;
+  --accent-blue-bright: #d3d9e1;
+  --accent-blue-dark: #a9b1bd;
+  --accent-blue-hover: #ced4dd;
+  --accent-green: #c3c9d2;
+  --accent-yellow: #c7cdd5;
+  --accent-orange: #c2c9d2;
+  --accent-red: #c1c8d1;
+  --accent-purple: #bfc6d0;
+  --accent-cyan: #c8ced7;
+  --accent-lime: #c4cad3;
 
   /* =========================
      STATUS COLORS
      ========================= */
-  --status-success: #10b981;
-  --status-warning: #fbbf24;
-  --status-error: #ef4444;
-  --status-info: #60a5fa;
+  --status-success: #c5cbd4;
+  --status-warning: #c4cbd4;
+  --status-error: #c3cad3;
+  --status-info: #c8ced7;
+
+  /* =========================
+     GLASS TOKENS
+     ========================= */
+  --glass-bg: rgba(16, 20, 27, 0.84);
+  --glass-strong: rgba(16, 20, 27, 0.94);
+  --glass-border: rgba(229, 234, 242, 0.11);
+  --glass-highlight: rgba(229, 234, 242, 0.025);
+  --glass-shadow: 0 8px 24px rgba(0, 0, 0, 0.34);
+  --glass-blur: 8px;
 
   /* =========================
      TYPOGRAPHY
      ========================= */
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-  --font-mono: 'Fira Code', 'Consolas', 'Monaco', monospace;
+  --font-sans: "Bahnschrift", "Aptos", "Segoe UI Variable", "Trebuchet MS", sans-serif;
+  --font-mono: "Cascadia Mono", "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
 
-  --text-xs: 0.75rem;     /* 12px */
-  --text-sm: 0.875rem;    /* 14px */
-  --text-base: 1rem;      /* 16px */
-  --text-lg: 1.125rem;    /* 18px */
-  --text-xl: 1.25rem;     /* 20px */
-  --text-2xl: 1.5rem;     /* 24px */
-  --text-3xl: 1.875rem;   /* 30px */
+  --text-xs: 0.75rem; /* 12px */
+  --text-sm: 0.875rem; /* 14px */
+  --text-base: 1rem; /* 16px */
+  --text-lg: 1.125rem; /* 18px */
+  --text-xl: 1.25rem; /* 20px */
+  --text-2xl: 1.5rem; /* 24px */
+  --text-3xl: 1.875rem; /* 30px */
 
   --weight-normal: 400;
   --weight-medium: 500;
@@ -137,10 +157,11 @@
   /* =========================
      SHADOWS
      ========================= */
-  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  --shadow-xs: 0 1px 1px rgba(0, 0, 0, 0.28);
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.34);
+  --shadow-md: 0 6px 12px -5px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 20px -10px rgba(0, 0, 0, 0.42);
+  --shadow-xl: 0 18px 28px -14px rgba(0, 0, 0, 0.46);
+  --shadow-2xl: 0 24px 36px -18px rgba(0, 0, 0, 0.5);
   --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.3);
 }

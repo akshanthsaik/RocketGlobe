@@ -1,6 +1,9 @@
-const API_BASE_URL = "http://127.0.0.1:8000/api";
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
-// Types matching backend schemas EXACTLY
+export const API_ORIGIN = new URL(API_BASE_URL).origin;
+
+// Types matching backend schemas
 export interface Agency {
   id: number;
   ll2_id?: number | null;
@@ -66,14 +69,12 @@ export interface Launch {
   video_url?: string | null;
 }
 
-// Status classification - Updated to match actual LL2 API statuses
 export const LAUNCH_STATUS = {
   UPCOMING: ["Go", "TBD", "TBC", "On Hold", "To Be Confirmed", "To Be Determined"],
   DECIDED: ["Go for Launch", "Go"],
   PREVIOUS: ["Success", "Failure", "Partial Failure", "Success (Partial Failure)"],
 } as const;
 
-// API Client
 class RocketGlobeAPI {
   private baseURL: string;
 
@@ -82,32 +83,25 @@ class RocketGlobeAPI {
   }
 
   private async fetch<T>(endpoint: string): Promise<T> {
-    try {
-      const url = `${this.baseURL}${endpoint}`;
-      console.log(`🌐 API Request: ${url}`);
+    const url = `${this.baseURL}${endpoint}`;
+    return this.fetchAbsolute<T>(url);
+  }
 
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+  private async fetchAbsolute<T>(url: string): Promise<T> {
+    try {
+      const response = await fetch(url, { method: "GET" });
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(
-          `API Error ${response.status}: ${errorText || response.statusText}`,
-        );
+        throw new Error(`API Error ${response.status}: ${errorText || response.statusText}`);
       }
 
-      const data = await response.json();
-      return data;
+      return (await response.json()) as T;
     } catch (error) {
       if (error instanceof Error) {
-        console.error(`❌ API request failed: ${endpoint}`, error.message);
         throw error;
       }
-      throw new Error(`Unknown error fetching ${endpoint}`);
+      throw new Error(`Unknown error fetching ${url}`);
     }
   }
 
@@ -128,7 +122,7 @@ class RocketGlobeAPI {
         }
       });
     }
-    const endpoint = `/launches${query.toString() ? `?${query}` : ""}`;
+    const endpoint = `/launches/${query.toString() ? `?${query}` : ""}`;
     return this.fetch<Launch[]>(endpoint);
   }
 
@@ -154,7 +148,7 @@ class RocketGlobeAPI {
         }
       });
     }
-    const endpoint = `/pads${query.toString() ? `?${query}` : ""}`;
+    const endpoint = `/pads/${query.toString() ? `?${query}` : ""}`;
     return this.fetch<Pad[]>(endpoint);
   }
 
@@ -178,7 +172,7 @@ class RocketGlobeAPI {
         }
       });
     }
-    const endpoint = `/agencies${query.toString() ? `?${query}` : ""}`;
+    const endpoint = `/agencies/${query.toString() ? `?${query}` : ""}`;
     return this.fetch<Agency[]>(endpoint);
   }
 
@@ -201,7 +195,7 @@ class RocketGlobeAPI {
         }
       });
     }
-    const endpoint = `/rockets${query.toString() ? `?${query}` : ""}`;
+    const endpoint = `/rockets/${query.toString() ? `?${query}` : ""}`;
     return this.fetch<Rocket[]>(endpoint);
   }
 
@@ -209,14 +203,10 @@ class RocketGlobeAPI {
     return this.fetch<Rocket>(`/rockets/${id}`);
   }
 
-  // Health check
-  async healthCheck(): Promise<{ status: string; message: string }> {
-    return this.fetch<{ status: string; message: string }>("/health");
+  async healthCheck(): Promise<{ status: string; database?: string; data?: unknown }> {
+    const url = `${API_ORIGIN}/health`;
+    return this.fetchAbsolute<{ status: string; database?: string; data?: unknown }>(url);
   }
 }
 
-// Export singleton instance
 export const api = new RocketGlobeAPI();
-
-// Export API base URL for other uses
-export { API_BASE_URL };

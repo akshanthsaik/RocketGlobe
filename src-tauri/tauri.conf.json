@@ -25,11 +25,10 @@
     "active": true,
     "targets": "all",
     "resources": [
-      "../backend/app/**",
-      "../backend/alembic/**",
-      "../backend/alembic.ini",
-      "../backend/pyproject.toml",
-      "../backend/requirements.txt"
+      "resources/backend/run_backend.exe",
+      "resources/postgres/bin",
+      "resources/postgres/lib",
+      "resources/postgres/share"
     ],
     "icon": [
       "icons/32x32.png",
@@ -40,4 +39,3 @@
     ]
   }
 }
-

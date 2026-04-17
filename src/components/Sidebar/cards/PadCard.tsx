@@ -17,7 +17,7 @@ export function PadCard({ pad, launchCount, onClick }: PadCardProps) {
           <h4 className="pad-card-title">{pad.name}</h4>
           {pad.country_code && (
             <div className="pad-card-location">
-              {getCountryFlag(pad.country_code)} {pad.country_code}
+              {getCountryFlag(pad.country_code)}
             </div>
           )}
         </div>

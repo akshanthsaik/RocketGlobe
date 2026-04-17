@@ -42,7 +42,7 @@ export function RocketDetailView({ rocket }: RocketDetailViewProps) {
   return (
     <div className="rocket-detail-view">
       <div className="view-header">
-        <button className="back-btn" onClick={popSidebarView}>
+        <button type="button" className="back-btn" onClick={popSidebarView}>
           <svg
             width="20"
             height="20"
@@ -103,9 +103,11 @@ export function RocketDetailView({ rocket }: RocketDetailViewProps) {
 
         {/* Manufacturer */}
         {manufacturer && (
-          <div
+          <button
+            type="button"
             className="info-card"
             onClick={() => navigateToAgency(manufacturer.id)}
+            aria-label={`Open agency ${manufacturer.name}`}
           >
             <div className="info-card-header">
               <div className="info-card-icon">
@@ -116,16 +118,16 @@ export function RocketDetailView({ rocket }: RocketDetailViewProps) {
                     className="agency-logo"
                   />
                 ) : (
-                  "🏢"
+                  "ORG"
                 )}
               </div>
               <div className="info-card-content">
                 <div className="info-card-label">Manufacturer</div>
                 <div className="info-card-title">{manufacturer.name}</div>
               </div>
-              <div className="nav-arrow">→</div>
+              <div className="nav-arrow">-&gt;</div>
             </div>
-          </div>
+          </button>
         )}
 
         {/* Stats */}

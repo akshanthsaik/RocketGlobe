@@ -2,18 +2,21 @@
    GLOBE LEGEND
    ========================= */
 
-.globe-legend {
+.globe-overlays .globe-legend {
   position: absolute;
-  bottom: var(--space-6);
-  right: var(--space-6);
+  left: var(--space-6);
+  right: auto;
+  top: auto;
+  bottom: var(--overlay-bottom-desktop, var(--space-6));
   min-width: 160px;
   padding: var(--space-4);
-  background: var(--bg-card);
-  border: 1px solid var(--border-normal);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
-  backdrop-filter: blur(8px);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(var(--glass-blur));
   z-index: var(--z-legend);
+  max-width: 220px;
 }
 
 /* =========================
@@ -56,12 +59,14 @@
    ========================= */
 
 @media (max-width: 767px) {
-  .globe-legend {
-    bottom: auto;
-    top: var(--space-4);
-    right: var(--space-4);
+  .globe-overlays .globe-legend {
+    left: var(--space-4);
+    right: auto;
+    top: auto;
+    bottom: var(--overlay-bottom-mobile, var(--space-4));
     padding: var(--space-3);
     min-width: 140px;
+    max-width: 180px;
   }
 
   .legend-item {

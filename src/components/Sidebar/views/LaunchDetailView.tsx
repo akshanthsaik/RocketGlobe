@@ -1,5 +1,4 @@
-// src/components/Sidebar/views/LaunchDetailView.tsx
-import { useLaunchStore } from "../../../store/launchStore";
+﻿import { useLaunchStore } from "../../../store/launchStore";
 import { Launch } from "../../../lib/api";
 import {
   formatDate,
@@ -13,16 +12,20 @@ interface LaunchDetailViewProps {
   launch: Launch;
 }
 
+const ICON_ROCKET = "RKT";
+const ICON_AGENCY = "AGY";
+const ICON_PAD = "PAD";
+const ARROW_RIGHT = "->";
+const BULLET = " | ";
+
 export function LaunchDetailView({ launch }: LaunchDetailViewProps) {
-  const {
-    pads,
-    rockets,
-    agencies,
-    popSidebarView,
-    navigateToPad,
-    navigateToRocket,
-    navigateToAgency,
-  } = useLaunchStore();
+  const pads = useLaunchStore((state) => state.pads);
+  const rockets = useLaunchStore((state) => state.rockets);
+  const agencies = useLaunchStore((state) => state.agencies);
+  const popSidebarView = useLaunchStore((state) => state.popSidebarView);
+  const navigateToPad = useLaunchStore((state) => state.navigateToPad);
+  const navigateToRocket = useLaunchStore((state) => state.navigateToRocket);
+  const navigateToAgency = useLaunchStore((state) => state.navigateToAgency);
 
   const pad = pads.find((p) => p.id === launch.pad_id);
   const rocket = rockets.find((r) => r.id === launch.rocket_id);
@@ -31,7 +34,7 @@ export function LaunchDetailView({ launch }: LaunchDetailViewProps) {
   return (
     <div className="launch-detail-view">
       <div className="view-header">
-        <button className="back-btn" onClick={popSidebarView}>
+        <button type="button" className="back-btn" onClick={popSidebarView}>
           <svg
             width="20"
             height="20"
@@ -74,14 +77,47 @@ export function LaunchDetailView({ launch }: LaunchDetailViewProps) {
           </div>
         )}
 
+        {/* Mission Info */}
+        {(launch.mission_name ||
+          launch.mission_description ||
+          launch.mission_type ||
+          launch.orbit) && (
+          <div className="detail-section">
+            <div className="detail-label">Mission</div>
+            {launch.mission_name && (
+              <div className="detail-row">
+                <span className="detail-key">Name:</span>
+                <span className="detail-value">{launch.mission_name}</span>
+              </div>
+            )}
+            {launch.mission_type && (
+              <div className="detail-row">
+                <span className="detail-key">Type:</span>
+                <span className="detail-value">{launch.mission_type}</span>
+              </div>
+            )}
+            {launch.orbit && (
+              <div className="detail-row">
+                <span className="detail-key">Orbit:</span>
+                <span className="detail-value">{launch.orbit}</span>
+              </div>
+            )}
+            {launch.mission_description && (
+              <div className="detail-value">{launch.mission_description}</div>
+            )}
+          </div>
+        )}
+
         {/* Rocket Info */}
         {rocket && (
-          <div
+          <button
+            type="button"
             className="info-card"
             onClick={() => navigateToRocket(rocket.id)}
+            aria-label={`Open rocket ${rocket.full_name || rocket.name}`}
           >
             <div className="info-card-header">
-              <div className="info-card-icon">🚀</div>
+              <div className="info-card-icon">{ICON_ROCKET}</div>
               <div className="info-card-content">
                 <div className="info-card-label">Rocket</div>
                 <div className="info-card-title">
@@ -89,20 +125,23 @@ export function LaunchDetailView({ launch }: LaunchDetailViewProps) {
                 </div>
                 {rocket.family && (
                   <div className="info-card-meta">
-                    {rocket.family} {rocket.variant && `• ${rocket.variant}`}
+                    {rocket.family}
+                    {rocket.variant ? ` ${BULLET} ${rocket.variant}` : ""}
                   </div>
                 )}
               </div>
-              <div className="nav-arrow">→</div>
+              <div className="nav-arrow">{ARROW_RIGHT}</div>
             </div>
-          </div>
+          </button>
         )}
 
         {/* Agency Info */}
         {agency && (
-          <div
+          <button
+            type="button"
             className="info-card"
             onClick={() => navigateToAgency(agency.id)}
+            aria-label={`Open agency ${agency.name}`}
           >
             <div className="info-card-header">
               <div className="info-card-icon">
@@ -113,41 +152,44 @@ export function LaunchDetailView({ launch }: LaunchDetailViewProps) {
                     className="agency-logo"
                   />
                 ) : (
-                  "🏢"
+                  ICON_AGENCY
                 )}
               </div>
               <div className="info-card-content">
                 <div className="info-card-label">Agency</div>
                 <div className="info-card-title">{agency.name}</div>
                 <div className="info-card-meta">
-                  {agency.country_code &&
-                    `${getCountryFlag(agency.country_code)} ${agency.country_code}`}
-                  {agency.type && ` • ${agency.type}`}
+                  {agency.country_code && getCountryFlag(agency.country_code)}
+                  {agency.type ? ` ${BULLET} ${agency.type}` : ""}
                 </div>
               </div>
-              <div className="nav-arrow">→</div>
+              <div className="nav-arrow">{ARROW_RIGHT}</div>
             </div>
-          </div>
+          </button>
         )}
 
         {/* Pad Info */}
         {pad && (
-          <div className="info-card" onClick={() => navigateToPad(pad.id)}>
+          <button
+            type="button"
+            className="info-card"
+            onClick={() => navigateToPad(pad.id)}
+            aria-label={`Open launch pad ${pad.name}`}
+          >
             <div className="info-card-header">
-              <div className="info-card-icon">📍</div>
+              <div className="info-card-icon">{ICON_PAD}</div>
               <div className="info-card-content">
                 <div className="info-card-label">Launch Pad</div>
                 <div className="info-card-title">{pad.name}</div>
                 <div className="info-card-meta">
-                  {pad.country_code &&
-                    `${getCountryFlag(pad.country_code)} ${pad.country_code}`}
+                  {pad.country_code && getCountryFlag(pad.country_code)}
                   <br />
                   {formatCoordinates(pad.latitude, pad.longitude)}
                 </div>
               </div>
-              <div className="nav-arrow">→</div>
+              <div className="nav-arrow">{ARROW_RIGHT}</div>
             </div>
-          </div>
+          </button>
         )}
 
         {/* Launch Window */}
@@ -172,6 +214,34 @@ export function LaunchDetailView({ launch }: LaunchDetailViewProps) {
             )}
           </div>
         )}
+
+        {(launch.webcast_live !== null && launch.webcast_live !== undefined) ||
+        launch.video_url ? (
+          <div className="detail-section">
+            <div className="detail-label">Media</div>
+            {launch.webcast_live !== null && launch.webcast_live !== undefined && (
+              <div className="detail-row">
+                <span className="detail-key">Webcast:</span>
+                <span className="detail-value">
+                  {launch.webcast_live ? "Live" : "Not live"}
+                </span>
+              </div>
+            )}
+            {launch.video_url && (
+              <div className="detail-row">
+                <span className="detail-key">Video:</span>
+                <a
+                  className="detail-value detail-link"
+                  href={launch.video_url}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Open video
+                </a>
+              </div>
+            )}
+          </div>
+        ) : null}
       </div>
     </div>
   );

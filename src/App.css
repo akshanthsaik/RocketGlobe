@@ -10,7 +10,7 @@
   height: 100dvh;
   overflow: hidden;
   padding-top: var(--header-height);
-  padding-bottom: var(--timeline-active-height,0);
+  padding-bottom: var(--timeline-active-height, 0);
 }
 
 
@@ -23,7 +23,7 @@
   position: relative;
   background: var(--bg-dark);
   z-index: var(--z-timeline);
-  transition: all var(--transition-base);
+  transition: transform var(--transition-base), opacity var(--transition-base);
 }
 
 
@@ -37,6 +37,7 @@
   position: relative;
   min-height: 0; /* critical for nested flex + overflow */
   overflow: hidden;
+  background: var(--bg-space);
 }
 
 /* =========================
@@ -47,7 +48,6 @@
   position: fixed;
   inset: 0;
   background: var(--bg-overlay);
-  backdrop-filter: blur(8px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -61,7 +61,7 @@
   width: 64px;
   height: 64px;
   border: 4px solid var(--border-normal);
-  border-top-color: var(--accent-blue);
+  border-top-color: var(--text-secondary);
   border-radius: var(--radius-full);
   animation: spin 1s linear infinite;
 }
@@ -99,7 +99,7 @@
 }
 
 .error-content h1 {
-  color: var(--accent-red);
+  color: var(--text-primary);
   font-size: var(--text-3xl);
   font-weight: var(--weight-bold);
   margin-bottom: var(--space-4);
@@ -113,7 +113,7 @@
 }
 
 .retry-btn {
-  background: var(--accent-blue);
+  background: var(--text-secondary);
   color: var(--text-primary);
   padding: var(--space-3) var(--space-8);
   border-radius: var(--radius-lg);
@@ -130,9 +130,10 @@
 }
 
 .retry-btn:hover {
-  background: var(--accent-blue-bright);
+  background: var(--text-primary);
+  color: var(--bg-dark);
   transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(96, 165, 250, 0.4);
+  box-shadow: 0 8px 20px rgba(229, 234, 242, 0.18);
 }
 
 .retry-btn:active {

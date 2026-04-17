@@ -1,24 +1,46 @@
 // src/components/Sidebar/tabs/AgenciesTab.tsx
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { KeyboardEvent, UIEvent } from "react";
 import { useLaunchStore } from "../../../store/launchStore";
 import { getCountryFlag } from "../../../lib/utils";
 import "./Tab.css";
+
+const PAGE_SIZE = 200;
 
 export function AgenciesTab() {
   const agencies = useLaunchStore((state) => state.agencies);
   const launches = useLaunchStore((state) => state.launches);
   const navigateToAgency = useLaunchStore((state) => state.navigateToAgency);
-  const [searchQuery, setSearchQuery] = useState("");
+  const agencySearchQuery = useLaunchStore((state) => state.agencySearchQuery);
+  const setAgencySearchQuery = useLaunchStore(
+    (state) => state.setAgencySearchQuery,
+  );
   const [sortBy, setSortBy] = useState<"name" | "launches">("launches");
   const [filterType, setFilterType] = useState<
     "all" | "government" | "commercial"
   >("all");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [agencySearchQuery, sortBy, filterType, agencies.length, launches.length]);
+
+  const agencyCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const launch of launches) {
+      if (launch.agency_id == null) continue;
+      counts.set(launch.agency_id, (counts.get(launch.agency_id) || 0) + 1);
+    }
+    return counts;
+  }, [launches]);
 
   const sortedAgencies = useMemo(() => {
     let filtered = agencies.filter(
-      (agency) =>
-        agency.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        agency.abbrev?.toLowerCase().includes(searchQuery.toLowerCase()),
+        (agency) =>
+          agency.name.toLowerCase().includes(agencySearchQuery.toLowerCase()) ||
+          agency.abbrev
+            ?.toLowerCase()
+            .includes(agencySearchQuery.toLowerCase()),
     );
 
     // Filter by type
@@ -38,7 +60,7 @@ export function AgenciesTab() {
 
     const agenciesWithCounts = filtered.map((agency) => ({
       ...agency,
-      launchCount: launches.filter((l) => l.agency_id === agency.id).length,
+      launchCount: agencyCounts.get(agency.id) || 0,
     }));
 
     return agenciesWithCounts.sort((a, b) => {
@@ -47,7 +69,30 @@ export function AgenciesTab() {
       }
       return a.name.localeCompare(b.name);
     });
-  }, [agencies, launches, searchQuery, sortBy, filterType]);
+  }, [agencies, agencyCounts, agencySearchQuery, sortBy, filterType]);
+
+  const visibleAgencies = sortedAgencies.slice(0, visibleCount);
+  const canLoadMore = sortedAgencies.length > visibleCount;
+
+  const handleListScroll = (event: UIEvent<HTMLDivElement>) => {
+    if (!canLoadMore) return;
+    const target = event.currentTarget;
+    if (target.scrollHeight - target.scrollTop - target.clientHeight < 200) {
+      setVisibleCount((prev) =>
+        Math.min(prev + PAGE_SIZE, sortedAgencies.length),
+      );
+    }
+  };
+
+  const handleAgencyKeyDown = (
+    event: KeyboardEvent<HTMLDivElement>,
+    agencyId: number,
+  ) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      navigateToAgency(agencyId);
+    }
+  };
 
   return (
     <div className="agencies-tab">
@@ -55,26 +100,30 @@ export function AgenciesTab() {
         <input
           type="text"
           placeholder="Search agencies..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          value={agencySearchQuery}
+          onChange={(e) => setAgencySearchQuery(e.target.value)}
           className="search-input"
+          aria-label="Search agencies"
         />
 
         <div className="filter-chips">
           <button
             className={`filter-chip ${filterType === "all" ? "active" : ""}`}
+            type="button"
             onClick={() => setFilterType("all")}
           >
             All
           </button>
           <button
             className={`filter-chip ${filterType === "government" ? "active" : ""}`}
+            type="button"
             onClick={() => setFilterType("government")}
           >
             Government
           </button>
           <button
             className={`filter-chip ${filterType === "commercial" ? "active" : ""}`}
+            type="button"
             onClick={() => setFilterType("commercial")}
           >
             Commercial
@@ -84,12 +133,14 @@ export function AgenciesTab() {
         <div className="sort-buttons">
           <button
             className={`sort-btn ${sortBy === "launches" ? "active" : ""}`}
+            type="button"
             onClick={() => setSortBy("launches")}
           >
             By Launches
           </button>
           <button
             className={`sort-btn ${sortBy === "name" ? "active" : ""}`}
+            type="button"
             onClick={() => setSortBy("name")}
           >
             By Name
@@ -97,13 +148,20 @@ export function AgenciesTab() {
         </div>
       </div>
 
-      <div className="agencies-list">
-        <div className="list-count">{sortedAgencies.length} agencies</div>
-        {sortedAgencies.map((agency) => (
+      <div className="agencies-list" onScroll={handleListScroll}>
+        <div className="list-count">
+          {Math.min(visibleCount, sortedAgencies.length)} of{" "}
+          {sortedAgencies.length} agencies
+        </div>
+        {visibleAgencies.map((agency) => (
           <div
             key={agency.id}
             className="agency-item"
+            role="button"
+            tabIndex={0}
             onClick={() => navigateToAgency(agency.id)}
+            onKeyDown={(event) => handleAgencyKeyDown(event, agency.id)}
+            aria-label={`Open details for ${agency.name}`}
           >
             <div className="agency-logo">
               {agency.logo_url ? (
@@ -134,6 +192,29 @@ export function AgenciesTab() {
             </div>
           </div>
         ))}
+
+        {sortedAgencies.length === 0 && (
+          <div className="empty-state">
+            <div className="empty-state-title">No agencies found</div>
+            <div className="empty-state-text">
+              Try a different search or filter.
+            </div>
+          </div>
+        )}
+
+        {canLoadMore && (
+          <button
+            className="load-more-btn"
+            type="button"
+            onClick={() =>
+              setVisibleCount((prev) =>
+                Math.min(prev + PAGE_SIZE, sortedAgencies.length),
+              )
+            }
+          >
+            Load more
+          </button>
+        )}
       </div>
     </div>
   );

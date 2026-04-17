@@ -11,6 +11,16 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
+class LL2RateLimitError(Exception):
+    def __init__(self, wait_seconds: float, max_wait_seconds: int, url: str):
+        self.wait_seconds = wait_seconds
+        self.max_wait_seconds = max_wait_seconds
+        self.url = url
+        super().__init__(
+            f"LL2 rate limit window too long ({wait_seconds:.1f}s) for {url}; max allowed wait is {max_wait_seconds}s"
+        )
+
+
 class LL2Client:
     """
     Launch Library 2 API client with rate limiting and retry logic.
@@ -25,6 +35,7 @@ class LL2Client:
         jitter_factor: float = 0.1,
         max_retries: Optional[int] = None,
         max_wait_seconds: Optional[int] = None,
+        max_request_duration: Optional[int] = None,
     ):
         self.base_url = base_url or settings.LL2_BASE_URL
         self.client = httpx.AsyncClient(timeout=30.0, follow_redirects=True)
@@ -34,6 +45,7 @@ class LL2Client:
             if min_request_interval is not None
             else settings.LL2_MIN_REQUEST_INTERVAL
         )
+        self._base_min_request_interval = self._min_request_interval
         self.base_backoff = (
             base_backoff if base_backoff is not None else settings.LL2_BASE_BACKOFF
         )
@@ -48,6 +60,11 @@ class LL2Client:
             max_wait_seconds
             if max_wait_seconds is not None
             else settings.LL2_MAX_WAIT_SECONDS
+        )
+        self.max_request_duration = (
+            max_request_duration
+            if max_request_duration is not None
+            else settings.LL2_MAX_REQUEST_DURATION
         )
 
     async def _rate_limit(self):
@@ -80,6 +97,7 @@ class LL2Client:
 
         url = f"{self.base_url}/{endpoint}"
         retries = retries or self.max_retries
+        request_started = asyncio.get_running_loop().time()
 
         for attempt in range(retries):
             # Ensure we respect spacing between calls
@@ -89,6 +107,12 @@ class LL2Client:
                 logger.info("Requesting: %s (attempt %s/%s)", url, attempt + 1, retries)
                 response = await self.client.get(url, params=params)
                 response.raise_for_status()
+
+                # Recover to the baseline request interval after successful calls.
+                self._min_request_interval = max(
+                    self._base_min_request_interval,
+                    self._min_request_interval * 0.8,
+                )
                 return response.json()
 
             except httpx.HTTPStatusError as e:
@@ -145,14 +169,15 @@ class LL2Client:
                     jitter = random.uniform(0, self.jitter_factor * wait_time)
                     total_sleep = wait_time + jitter
 
-                    # Avoid multi-hour sleep loops; cap and continue.
-                    if total_sleep > self.max_wait_seconds:
+                    # Fail fast when the server asks for a very long wait. This keeps
+                    # sync responsive and surfaces actionable information to the user.
+                    if wait_time > self.max_wait_seconds:
                         logger.warning(
-                            "Rate limited for %.1fs; capping sleep to %ss",
-                            total_sleep,
+                            "Rate limited for %.1fs which exceeds max wait %ss; aborting request",
+                            wait_time,
                             self.max_wait_seconds,
                         )
-                        total_sleep = float(self.max_wait_seconds)
+                        raise LL2RateLimitError(wait_time, self.max_wait_seconds, url)
 
                     # Optionally increase spacing between requests temporarily
                     self._min_request_interval = max(
@@ -160,11 +185,23 @@ class LL2Client:
                     )
 
                     logger.warning(
-                        "Rate limited (429). Sleeping %.1fs (base %.1fs, jitter %.2fs)",
-                        total_sleep,
+                        "Rate limited (429). Waiting after Retry-After/backoff (base %.1fs, jitter %.2fs)",
                         wait_time,
                         jitter,
                     )
+                    elapsed = asyncio.get_running_loop().time() - request_started
+                    remaining = self.max_request_duration - elapsed
+                    if remaining <= 0:
+                        raise TimeoutError(
+                            f"Retry budget exceeded for {url} after {elapsed:.1f}s"
+                        )
+                    effective_sleep = min(total_sleep, remaining)
+                    logger.warning(
+                        "Rate limited (429). Sleeping %.1fs (remaining budget %.1fs)",
+                        effective_sleep,
+                        remaining,
+                    )
+                    total_sleep = effective_sleep
                     await asyncio.sleep(total_sleep)
                     continue
 
@@ -175,10 +212,24 @@ class LL2Client:
                         jitter = random.uniform(0, self.jitter_factor * wait_time)
                         total_sleep = wait_time + jitter
                         logger.warning(
-                            "Server error %s. Retrying in %.1fs...",
+                            "Server error %s. Retrying after %.1fs backoff",
                             status,
                             total_sleep,
                         )
+                        elapsed = asyncio.get_running_loop().time() - request_started
+                        remaining = self.max_request_duration - elapsed
+                        if remaining <= 0:
+                            raise TimeoutError(
+                                f"Retry budget exceeded for {url} after {elapsed:.1f}s"
+                            )
+                        effective_sleep = min(total_sleep, remaining)
+                        logger.warning(
+                            "Server error %s. Sleeping %.1fs (remaining budget %.1fs)",
+                            status,
+                            effective_sleep,
+                            remaining,
+                        )
+                        total_sleep = effective_sleep
                         await asyncio.sleep(total_sleep)
                         continue
                     raise
@@ -192,7 +243,23 @@ class LL2Client:
                     wait_time = min(self.base_backoff * (2 ** attempt), self.max_backoff)
                     jitter = random.uniform(0, self.jitter_factor * wait_time)
                     total_sleep = wait_time + jitter
-                    logger.warning("Network error, retrying in %.1fs...", total_sleep)
+                    logger.warning(
+                        "Network error, retrying after %.1fs backoff",
+                        total_sleep,
+                    )
+                    elapsed = asyncio.get_running_loop().time() - request_started
+                    remaining = self.max_request_duration - elapsed
+                    if remaining <= 0:
+                        raise TimeoutError(
+                            f"Retry budget exceeded for {url} after {elapsed:.1f}s"
+                        )
+                    effective_sleep = min(total_sleep, remaining)
+                    logger.warning(
+                        "Network error, sleeping %.1fs (remaining budget %.1fs)",
+                        effective_sleep,
+                        remaining,
+                    )
+                    total_sleep = effective_sleep
                     await asyncio.sleep(total_sleep)
                     continue
                 raise
@@ -201,7 +268,8 @@ class LL2Client:
                 logger.error("Unexpected error: %s: %s", type(e).__name__, e)
                 raise
 
-        raise Exception(f"Failed after {retries} retries for {url}")
+        elapsed = asyncio.get_running_loop().time() - request_started
+        raise Exception(f"Failed after {retries} retries for {url} ({elapsed:.1f}s elapsed)")
     
     async def get_agencies(
         self,

@@ -1,4 +1,4 @@
-// src/lib/utils.ts
+﻿// src/lib/utils.ts
 import type { Launch } from "./api";
 
 /**
@@ -24,6 +24,39 @@ export function formatDate(dateString?: string | null): string {
     });
   } catch {
     return "Invalid Date";
+  }
+}
+
+/**
+ * Format date for compact card display (date + time)
+ */
+export function formatDateParts(
+  dateString?: string | null,
+): { date: string; time: string } {
+  if (!dateString) return { date: "TBD", time: "" };
+
+  try {
+    const date = new Date(dateString);
+
+    if (isNaN(date.getTime())) {
+      return { date: "Invalid Date", time: "" };
+    }
+
+    const datePart = date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+
+    const timePart = date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZoneName: "short",
+    });
+
+    return { date: datePart, time: timePart };
+  } catch {
+    return { date: "Invalid Date", time: "" };
   }
 }
 
@@ -189,50 +222,152 @@ export function getCountdown(dateString?: string | null): {
   }
 }
 
+const DEFAULT_COUNTRY_LABEL = "WORLD";
+
+const ALPHA3_TO_ALPHA2: Record<string, string> = {
+  USA: "US",
+  RUS: "RU",
+  CHN: "CN",
+  IND: "IN",
+  JPN: "JP",
+  KOR: "KR",
+  PRK: "KP",
+  IRN: "IR",
+  ISR: "IL",
+  NZL: "NZ",
+  GBR: "GB",
+  FRA: "FR",
+  DEU: "DE",
+  ITA: "IT",
+  ESP: "ES",
+  AUS: "AU",
+  CAN: "CA",
+  BRA: "BR",
+  MEX: "MX",
+  ARG: "AR",
+  ZAF: "ZA",
+  UKR: "UA",
+  KAZ: "KZ",
+  UAE: "AE",
+  ARE: "AE",
+  SAU: "SA",
+  TUR: "TR",
+  SWE: "SE",
+  NOR: "NO",
+  FIN: "FI",
+  DNK: "DK",
+  NLD: "NL",
+  BEL: "BE",
+  CHE: "CH",
+  AUT: "AT",
+  CZE: "CZ",
+  SVK: "SK",
+  HUN: "HU",
+  ROU: "RO",
+  BGR: "BG",
+  GRC: "GR",
+  PRT: "PT",
+  IRL: "IE",
+  ISL: "IS",
+  CHL: "CL",
+  COL: "CO",
+  PER: "PE",
+  VEN: "VE",
+  EGY: "EG",
+  DZA: "DZ",
+  MAR: "MA",
+  TUN: "TN",
+  QAT: "QA",
+  KWT: "KW",
+  OMN: "OM",
+  PAK: "PK",
+  IDN: "ID",
+  THA: "TH",
+  MYS: "MY",
+  SGP: "SG",
+  VNM: "VN",
+  PHL: "PH",
+  NGA: "NG",
+  KEN: "KE",
+  ETH: "ET",
+};
+
+export function normalizeCountryCode(countryCode?: string | null): string | null {
+  if (!countryCode) return null;
+  const cleaned = countryCode.trim().toUpperCase();
+  const alphaOnly = cleaned.replace(/[^A-Z]/g, "");
+  if (!alphaOnly) return null;
+  if (alphaOnly === "UK") return "GB";
+  if (alphaOnly.length === 2) return alphaOnly;
+  if (alphaOnly.length === 3) return ALPHA3_TO_ALPHA2[alphaOnly] || null;
+  return null;
+}
+
 /**
  * Get country flag emoji from country code
  */
 export function getCountryFlag(countryCode?: string | null): string {
-  if (!countryCode) return "🌍";
-
-  try {
-    const code = countryCode.toUpperCase();
-
-    if (code.length !== 2 && code.length !== 3) return "🌍";
-
-    // For 3-letter codes, convert to 2-letter
-    const twoLetterCode = code.length === 3 ? code.substring(0, 2) : code;
-
-    // Convert country code to flag emoji
-    return String.fromCodePoint(
-      ...twoLetterCode.split("").map((char) => 127397 + char.charCodeAt(0)),
-    );
-  } catch {
-    return "🌍";
-  }
+  const normalized = normalizeCountryCode(countryCode);
+  if (!normalized || normalized.length !== 2) return DEFAULT_COUNTRY_LABEL;
+  return normalized
+    .split("")
+    .map((char) => String.fromCodePoint(127397 + char.charCodeAt(0)))
+    .join("");
 }
 
 /**
  * Get country name from country code
  */
 export const COUNTRY_NAMES: Record<string, string> = {
+  US: "United States",
   USA: "United States",
+  RU: "Russia",
   RUS: "Russia",
+  CN: "China",
   CHN: "China",
+  IN: "India",
   IND: "India",
+  JP: "Japan",
   JPN: "Japan",
-  ESA: "Europe",
+  KR: "South Korea",
   KOR: "South Korea",
+  IR: "Iran",
   IRN: "Iran",
+  IL: "Israel",
   ISR: "Israel",
+  NZ: "New Zealand",
   NZL: "New Zealand",
+  GB: "United Kingdom",
+  GBR: "United Kingdom",
+  FR: "France",
+  DE: "Germany",
+  IT: "Italy",
+  ES: "Spain",
+  EU: "European Union",
+  ESA: "European Space Agency",
 };
+
+const REGION_NAMES =
+  typeof Intl !== "undefined" && "DisplayNames" in Intl
+    ? new Intl.DisplayNames(["en"], { type: "region" })
+    : null;
 
 export function getCountryName(countryCode?: string | null): string {
   if (!countryCode) return "Unknown";
-  return COUNTRY_NAMES[countryCode.toUpperCase()] || countryCode;
-}
 
+  const normalized = normalizeCountryCode(countryCode);
+  if (normalized && REGION_NAMES) {
+    const name = REGION_NAMES.of(normalized);
+    if (name) return name;
+  }
+
+  const direct = COUNTRY_NAMES[countryCode.toUpperCase()];
+  if (direct) return direct;
+
+  if (normalized && COUNTRY_NAMES[normalized]) return COUNTRY_NAMES[normalized];
+
+  return countryCode;
+}
 /**
  * Truncate text to max length
  */
@@ -352,16 +487,16 @@ export function debounce<T extends (...args: any[]) => any>(
  * Generate color for rocket family
  */
 export const ROCKET_FAMILY_COLORS: Record<string, string> = {
-  Falcon: "#60a5fa",
-  Soyuz: "#f87171",
-  Atlas: "#fb923c",
-  Delta: "#fbbf24",
-  Ariane: "#4ade80",
-  Proton: "#22d3ee",
-  "Long March": "#f472b6",
-  GSLV: "#a78bfa",
-  "H-IIA": "#60a5fa",
-  Epsilon: "#22d3ee",
+  Falcon: "#cfd4dc",
+  Soyuz: "#c6ccd6",
+  Atlas: "#bec5d0",
+  Delta: "#b7c0cc",
+  Ariane: "#b0bac8",
+  Proton: "#a9b4c2",
+  "Long March": "#a2adbc",
+  GSLV: "#9ca7b6",
+  "H-IIA": "#96a1b1",
+  Epsilon: "#909bac",
 };
 
 export function getRocketFamilyColor(family?: string | null): string {
@@ -380,20 +515,27 @@ export function getRocketFamilyColor(family?: string | null): string {
  * Generate color for country
  */
 export const COUNTRY_COLORS: Record<string, string> = {
-  USA: "#60a5fa",
-  RUS: "#f87171",
-  CHN: "#fbbf24",
-  IND: "#4ade80",
-  JPN: "#f472b6",
-  ESA: "#22d3ee",
-  KOR: "#fb923c",
-  IRN: "#a78bfa",
-  ISR: "#10b981",
-  NZL: "#8b5cf6",
+  US: "#cfd4dc",
+  RU: "#c8ced8",
+  CN: "#c1c8d3",
+  IN: "#bac2ce",
+  JP: "#b3bcc9",
+  EU: "#adb6c4",
+  KR: "#a7b1bf",
+  IR: "#a1abbb",
+  IL: "#9ba6b7",
+  NZ: "#96a1b2",
+  GB: "#909bad",
+  FR: "#8a95a8",
+  DE: "#858fa4",
+  IT: "#808a9f",
+  ES: "#7b859a",
 };
 
 export function getCountryColor(countryCode?: string | null): string {
   if (!countryCode) return "#a3a3a3";
+  const normalized = normalizeCountryCode(countryCode);
+  if (normalized && COUNTRY_COLORS[normalized]) return COUNTRY_COLORS[normalized];
   return COUNTRY_COLORS[countryCode.toUpperCase()] || "#a3a3a3";
 }
 
@@ -418,8 +560,9 @@ export function formatCoordinates(
 
   const latDir = lat >= 0 ? "N" : "S";
   const lonDir = lon >= 0 ? "E" : "W";
+  const degree = "\u00B0";
 
-  return `${Math.abs(lat).toFixed(4)}° ${latDir}, ${Math.abs(lon).toFixed(4)}° ${lonDir}`;
+  return `${Math.abs(lat).toFixed(4)}${degree} ${latDir}, ${Math.abs(lon).toFixed(4)}${degree} ${lonDir}`;
 }
 
 /**
@@ -462,3 +605,4 @@ export function getDaysUntilLaunch(dateString?: string | null): number | null {
     return null;
   }
 }
+

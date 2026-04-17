@@ -39,7 +39,7 @@ export function PadDetailView({ pad }: PadDetailViewProps) {
   return (
     <div className="pad-detail-view">
       <div className="view-header">
-        <button className="back-btn" onClick={popSidebarView}>
+        <button type="button" className="back-btn" onClick={popSidebarView}>
           <svg
             width="20"
             height="20"
@@ -60,7 +60,7 @@ export function PadDetailView({ pad }: PadDetailViewProps) {
           <h3 className="pad-name">{pad.name}</h3>
           {pad.country_code && (
             <div className="pad-country">
-              {getCountryFlag(pad.country_code)} {pad.country_code}
+              {getCountryFlag(pad.country_code)}
             </div>
           )}
         </div>

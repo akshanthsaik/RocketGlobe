@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // UNIFIED TYPE DEFINITIONS
 // Single source of truth for all data types
 // ============================================================================
@@ -15,6 +15,12 @@ export interface Launch {
   agency_id?: number | null;
   window_start?: string | null;
   window_end?: string | null;
+  mission_name?: string | null;
+  mission_description?: string | null;
+  mission_type?: string | null;
+  orbit?: string | null;
+  webcast_live?: boolean | null;
+  video_url?: string | null;
 }
 
 export interface Pad {

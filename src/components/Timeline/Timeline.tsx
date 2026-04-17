@@ -1,5 +1,5 @@
 // src/components/Timeline/Timeline.tsx
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useLaunchStore, getTimelineLaunches } from "../../store/launchStore";
 import { formatDateShort } from "../../lib/utils";
 import "./Timeline.css";
@@ -9,6 +9,7 @@ export function Timeline() {
   const isTimelinePlaying = useLaunchStore((state) => state.isTimelinePlaying);
   const timelineSpeed = useLaunchStore((state) => state.timelineSpeed);
   const timelineRange = useLaunchStore((state) => state.timelineRange);
+  const launches = useLaunchStore((state) => state.launches);
   const setTimelineDate = useLaunchStore((state) => state.setTimelineDate);
   const playTimeline = useLaunchStore((state) => state.playTimeline);
   const pauseTimeline = useLaunchStore((state) => state.pauseTimeline);
@@ -89,29 +90,27 @@ export function Timeline() {
     };
   }, [isDragging, handleScrubberMouseMove, handleScrubberMouseUp]);
 
-  // ✅ CORRECT: Use helper function properly
-  const getCurrentLaunchInfo = useCallback(() => {
-    if (!timelineDate) return null;
+  const timelineLaunches = useMemo(
+    () => getTimelineLaunches(launches),
+    [launches],
+  );
 
-    // Get timeline launches using the helper function
-    const state = useLaunchStore.getState();
-    const timelineLaunches = getTimelineLaunches(state.launches);
-
-    const visibleLaunches = timelineLaunches.filter(
+  const visibleLaunches = useMemo(() => {
+    if (!timelineDate) return [];
+    return timelineLaunches.filter(
       (l) => l.net && new Date(l.net) <= timelineDate,
     );
+  }, [timelineDate, timelineLaunches]);
 
+  const launchInfo = useMemo(() => {
     if (visibleLaunches.length === 0) return null;
-
     const currentLaunch = visibleLaunches[visibleLaunches.length - 1];
     return {
       launch: currentLaunch,
       count: visibleLaunches.length,
       total: timelineLaunches.length,
     };
-  }, [timelineDate]);
-
-  const launchInfo = getCurrentLaunchInfo();
+  }, [visibleLaunches, timelineLaunches.length]);
 
   if (!timelineRange) return null;
 
@@ -216,7 +215,7 @@ export function Timeline() {
             )}
             {launchInfo && (
               <div className="info-launch">
-                {launchInfo.launch.name} • {launchInfo.count}/{launchInfo.total}
+                {launchInfo.launch.name} | {launchInfo.count}/{launchInfo.total}
               </div>
             )}
           </div>

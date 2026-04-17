@@ -45,7 +45,7 @@ export function AgencyDetailView({ agency }: AgencyDetailViewProps) {
   return (
     <div className="agency-detail-view">
       <div className="view-header">
-        <button className="back-btn" onClick={popSidebarView}>
+        <button type="button" className="back-btn" onClick={popSidebarView}>
           <svg
             width="20"
             height="20"
@@ -87,7 +87,7 @@ export function AgencyDetailView({ agency }: AgencyDetailViewProps) {
             <div className="detail-row">
               <span className="detail-key">Country:</span>
               <span className="detail-value">
-                {getCountryFlag(agency.country_code)} {agency.country_code}
+                {getCountryFlag(agency.country_code)}
               </span>
             </div>
           )}

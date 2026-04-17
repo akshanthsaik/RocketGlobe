@@ -60,3 +60,5 @@ public/cesium/
 # Temp files
 *.tmp
 .temp/
+
+/src-tauri/resources/

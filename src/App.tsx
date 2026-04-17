@@ -12,8 +12,6 @@ function App() {
   const isLoading = useLaunchStore((state) => state.isLoading);
   const error = useLaunchStore((state) => state.error);
   const globeMode = useLaunchStore((state) => state.globeMode);
-  const timelineDate = useLaunchStore((state) => state.timelineDate);
-  const isTimelinePlaying = useLaunchStore((state) => state.isTimelinePlaying);
   const timelineEnabled = useLaunchStore((state) => state.timelineEnabled);
   const showTimeline = globeMode === "launches" && timelineEnabled;
 
@@ -21,26 +19,26 @@ function App() {
     fetchAllData();
   }, [fetchAllData]);
 
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--timeline-active-height",
+      showTimeline ? "var(--timeline-height)" : "0px",
+    );
+  }, [showTimeline]);
+
   if (error) {
     return (
-      <div className="error-overlay">
+      <div className="error-overlay" role="alert" aria-live="assertive">
         <div className="error-content">
           <h1>Error Loading Data</h1>
           <p>{error}</p>
-          <button onClick={fetchAllData} className="retry-btn">
+          <button type="button" onClick={fetchAllData} className="retry-btn">
             Retry
           </button>
         </div>
       </div>
     );
   }
-
-  useEffect(() => {
-  document.documentElement.style.setProperty(
-    '--timeline-active-height',
-    showTimeline ? 'var(--timeline-height)' : '0'
-  );
-}, [showTimeline]);
 
   return (
     <div className="app">
@@ -58,7 +56,7 @@ function App() {
       </div>
 
       {isLoading && (
-        <div className="loading-overlay">
+        <div className="loading-overlay" role="status" aria-live="polite">
           <div className="loading-spinner" />
           <div className="loading-text">Loading launch data...</div>
         </div>

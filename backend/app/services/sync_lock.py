@@ -19,7 +19,15 @@ def acquire_sync_lock(db: Session, resource: str, owner: str, ttl_seconds: int =
 
         # If locked and not expired, fail
         if row.is_locked:
-            if row.locked_at and (now - row.locked_at) < timedelta(seconds=ttl_seconds):
+            locked_at = row.locked_at
+            if locked_at and locked_at.tzinfo is None:
+                locked_at = locked_at.replace(tzinfo=timezone.utc)
+
+            if locked_at is None:
+                # Unknown lock age is treated as locked until recovered by stale-lock cleanup.
+                return False
+
+            if (now - locked_at) < timedelta(seconds=ttl_seconds):
                 return False
             # expired lock; override
 

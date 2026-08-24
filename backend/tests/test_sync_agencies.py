@@ -1,11 +1,12 @@
 import asyncio
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.models.base import Base
 from app.models.agency import Agency
+from app.models.base import Base
 from app.models.sync_state import SyncState
 from app.workers.sync_worker import sync_agencies
 
@@ -28,7 +29,7 @@ class MockClient:
 
 @pytest.fixture
 def in_memory_db():
-    engine = create_engine('sqlite:///:memory:', connect_args={"check_same_thread": False})
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Base.metadata.create_all(bind=engine)
     Session = sessionmaker(bind=engine)
     session = Session()

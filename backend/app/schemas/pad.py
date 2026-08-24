@@ -1,5 +1,7 @@
-from pydantic import BaseModel
 from typing import Optional
+
+from pydantic import BaseModel
+
 
 class PadBase(BaseModel):
     name: str
@@ -9,9 +11,10 @@ class PadBase(BaseModel):
     map_url: Optional[str] = None
     total_launch_count: int
 
+
 class PadResponse(PadBase):
     id: int
     ll2_id: int
-    
+
     class Config:
         from_attributes = True

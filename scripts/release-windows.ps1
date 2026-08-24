@@ -1,6 +1,5 @@
 param(
     [string]$DatabaseUrl = "",
-    [string]$CesiumToken = "",
     [switch]$SkipTypeCheck,
     [switch]$SkipBackendMigrate
 )
@@ -21,72 +20,15 @@ function Write-Step {
     Write-Host "==> $Message" -ForegroundColor Cyan
 }
 
-function Resolve-PostgresHome {
-    if (-not [string]::IsNullOrWhiteSpace($env:POSTGRES_HOME)) {
-        $candidate = $env:POSTGRES_HOME
-        if (Test-Path (Join-Path $candidate "bin\postgres.exe")) {
-            return $candidate
-        }
-    }
-
-    $base = "C:\Program Files\PostgreSQL"
-    if (-not (Test-Path $base)) {
-        return $null
-    }
-
-    $dirs = Get-ChildItem $base -Directory | Sort-Object {
-        try { [version]$_.Name } catch { [version]"0.0" }
-    } -Descending
-
-    foreach ($dir in $dirs) {
-        $candidate = $dir.FullName
-        if (Test-Path (Join-Path $candidate "bin\postgres.exe")) {
-            return $candidate
-        }
-    }
-
-    return $null
-}
-
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $backendRoot = Join-Path $repoRoot "backend"
 $venvPython = Join-Path $backendRoot "venv\Scripts\python.exe"
 $backendEnvPath = Join-Path $backendRoot ".env"
 $frontendEnvPath = Join-Path $repoRoot ".env"
-$postgresResourceRoot = Join-Path $repoRoot "src-tauri\resources\postgres"
 
 Require-Command "python"
 Require-Command "bun"
 Require-Command "cargo"
-
-Write-Step "Staging PostgreSQL runtime resources for Tauri bundle"
-
-$postgresHome = Resolve-PostgresHome
-if (-not $postgresHome) {
-    throw "Could not locate PostgreSQL installation. Set POSTGRES_HOME (e.g. C:\Program Files\PostgreSQL\18)."
-}
-
-Write-Host "Using PostgreSQL at: $postgresHome" -ForegroundColor DarkGray
-New-Item -ItemType Directory -Force -Path $postgresResourceRoot | Out-Null
-
-foreach ($dirName in @("bin", "lib", "share")) {
-    $src = Join-Path $postgresHome $dirName
-    $dst = Join-Path $postgresResourceRoot $dirName
-
-    if (-not (Test-Path $src)) {
-        throw "Missing PostgreSQL runtime directory: $src"
-    }
-
-    if (Test-Path $dst) {
-        Remove-Item -Recurse -Force $dst
-    }
-
-    Copy-Item -Path $src -Destination $dst -Recurse -Force
-}
-
-if (-not (Test-Path (Join-Path $postgresResourceRoot "share\postgres.bki"))) {
-    throw "PostgreSQL share files are incomplete. Missing share\\postgres.bki in $postgresResourceRoot"
-}
 
 Write-Step "Writing backend env file"
 
@@ -117,8 +59,9 @@ if (-not [string]::IsNullOrWhiteSpace($DatabaseUrl)) {
 $backendEnvContent | Set-Content -Encoding UTF8 $backendEnvPath
 
 Write-Step "Writing frontend env file"
+# No Cesium Ion token: the globe draws country outlines over a flat ground
+# rather than streaming imagery tiles, so a release needs no map credentials.
 @"
-VITE_CESIUM_ION_ACCESS_TOKEN=$CesiumToken
 VITE_API_BASE_URL=http://127.0.0.1:8000/api
 "@ | Set-Content -Encoding UTF8 $frontendEnvPath
 

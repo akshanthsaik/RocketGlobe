@@ -1,80 +1,96 @@
-/* src/components/Globe/PadInsetView.css */
-
+/* =========================================================
+   PAD INSET
+   Bottom-right of the globe pane. A flat panel, not a second
+   3D scene — see the note in PadInsetView.tsx.
+   ========================================================= */
 .globe-overlays .pad-inset-view {
   position: absolute;
+  right: var(--overlay-gutter);
+  bottom: var(--overlay-gutter);
   left: auto;
   top: auto;
-  right: var(--space-6);
-  bottom: var(--overlay-bottom-desktop, var(--space-6));
-
-  width: 280px;
-  height: 220px;
-
-  background: var(--glass-bg);
-  border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  backdrop-filter: blur(var(--glass-blur));
-  box-shadow: var(--glass-shadow);
-  overflow: hidden;
+  width: var(--inset-width);
+  background: var(--color-bg);
+  border: 2px solid var(--color-neutral-800);
   pointer-events: auto;
   z-index: var(--z-dropdown);
-  animation: slideIn 0.3s ease;
 }
 
 .inset-header {
-  padding: var(--space-3);
-  background: rgba(0, 0, 0, 0.25);
-  border-bottom: 1px solid var(--glass-border);
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  padding: 10px 12px;
+  border-bottom: var(--rule-section);
+}
+
+.inset-kicker {
+  font-size: var(--type-kicker);
+  letter-spacing: var(--kicker-tracking);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 
 .inset-title {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-}
-
-.inset-subtitle {
-  font-size: var(--text-xs);
-  color: var(--text-secondary);
-  white-space: nowrap;
+  font-family: var(--font-heading);
+  font-weight: var(--weight-extrabold);
+  font-size: var(--type-meta);
+  letter-spacing: -0.01em;
+  color: var(--color-text);
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.inset-viewer {
-  width: 100%;
-  height: calc(100% - 60px);
+.inset-coords {
+  font-size: var(--type-micro);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-text-3);
 }
 
-.inset-viewer .cesium-viewer-bottom,
-.inset-viewer .cesium-credit-logoContainer,
-.inset-viewer .cesium-credit-textContainer,
-.inset-viewer .cesium-viewer-toolbar {
-  display: none !important;
+/* A drawn stand-in for the close-up, not a map: a framed plot with the pad
+   marked at centre. It says "you are here" without pretending to detail it
+   does not have. */
+.inset-plot {
+  position: relative;
+  height: 108px;
+  background:
+    radial-gradient(circle at 46% 34%, #322e2c, #1b1817 70%),
+    var(--color-bg-well);
 }
 
-@keyframes slideIn {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.inset-plot-frame {
+  position: absolute;
+  inset: 8px;
+  border: 1px dashed var(--color-neutral-700);
+}
+
+.inset-plot-marker {
+  position: absolute;
+  left: 50%;
+  top: 54%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  background: var(--color-accent-500);
+  box-shadow: 0 0 0 6px rgba(236, 48, 19, 0.22);
+}
+
+.inset-launch {
+  padding: 9px 12px;
+  border-top: var(--rule-section);
+  font-size: var(--type-micro);
+  color: var(--color-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 @media (max-width: 767px) {
   .globe-overlays .pad-inset-view {
-    width: 200px;
-    height: 180px;
-    left: auto;
-    top: auto;
-    right: var(--space-4);
-    bottom: var(--overlay-bottom-mobile, var(--space-4));
+    right: var(--space-3);
+    bottom: var(--space-3);
+    width: 188px;
+  }
+
+  .inset-plot {
+    height: 82px;
   }
 }

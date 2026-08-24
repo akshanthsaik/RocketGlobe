@@ -1,172 +1,68 @@
-/* =========================
-   APP LAYOUT
-   ========================= */
-
+/* =========================================================
+   APP SHELL
+   Three rows: header, a strip that carries sync state, and the
+   working area. The middle row is `auto`, so it collapses to
+   nothing when there is no strip to show and pushes the layout
+   down rather than covering it when there is.
+   ========================================================= */
 .app {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: var(--header-height) auto minmax(0, 1fr);
   width: 100%;
-  min-height: 100vh;
   height: 100dvh;
+  min-height: 100vh;
   overflow: hidden;
-  padding-top: var(--header-height);
-  padding-bottom: var(--timeline-active-height, 0);
+  background: var(--color-bg);
 }
 
-
-/* =========================
-   TIMELINE
-   ========================= */
-
-
-.timeline-wrapper {
-  position: relative;
-  background: var(--bg-dark);
-  z-index: var(--z-timeline);
-  transition: transform var(--transition-base), opacity var(--transition-base);
+/* Rows are assigned explicitly rather than by source order: the sync strip
+   only exists some of the time, and implicit placement would slide the
+   working area up into the `auto` row whenever it is absent. */
+.app > .header {
+  grid-row: 1;
 }
 
+.app > .sync-feedback,
+.app > .sync-strip {
+  grid-row: 2;
+}
 
-/* =========================
-   MAIN CONTENT AREA
-   ========================= */
+.app > .main-container {
+  grid-row: 3;
+}
 
+/* =========================================================
+   WORKING AREA
+   ========================================================= */
 .main-container {
-  flex: 1 1 auto;
-  display: flex;
   position: relative;
+  display: flex;
   min-height: 0; /* critical for nested flex + overflow */
   overflow: hidden;
-  background: var(--bg-space);
+  background: var(--color-bg);
 }
 
-/* =========================
-   LOADING OVERLAY
-   ========================= */
-
-.loading-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--bg-overlay);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-6);
-  z-index: var(--z-loading);
-  animation: fade-in var(--transition-base);
+/* Globe above, timeline below. The second row is `auto`, so it costs nothing
+   when the timeline is off and the globe simply gets the height back. */
+.globe-column {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
 }
 
-.loading-spinner {
-  width: 64px;
-  height: 64px;
-  border: 4px solid var(--border-normal);
-  border-top-color: var(--text-secondary);
-  border-radius: var(--radius-full);
-  animation: spin 1s linear infinite;
-}
-
-.loading-text {
-  color: var(--text-secondary);
-  font-size: var(--text-lg);
-  font-weight: var(--weight-medium);
-  letter-spacing: -0.01em;
-}
-
-/* =========================
-   ERROR OVERLAY
-   ========================= */
-
-.error-overlay {
-  position: fixed;
-  inset: 0;
-  background: var(--bg-space);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: var(--space-6);
-  z-index: var(--z-loading);
-}
-
-.error-content {
-  text-align: center;
-  padding: var(--space-10);
-  max-width: 500px;
-  background: var(--bg-card);
-  border-radius: var(--radius-2xl);
-  box-shadow: var(--shadow-2xl);
-  animation: scale-in var(--transition-base);
-}
-
-.error-content h1 {
-  color: var(--text-primary);
-  font-size: var(--text-3xl);
-  font-weight: var(--weight-bold);
-  margin-bottom: var(--space-4);
-}
-
-.error-content p {
-  color: var(--text-secondary);
-  font-size: var(--text-base);
-  margin-bottom: var(--space-8);
-  line-height: 1.6;
-}
-
-.retry-btn {
-  background: var(--text-secondary);
-  color: var(--text-primary);
-  padding: var(--space-3) var(--space-8);
-  border-radius: var(--radius-lg);
-  font-size: var(--text-base);
-  font-weight: var(--weight-semibold);
-  cursor: pointer;
-  border: none;
-  min-height: 48px;
-  box-shadow: var(--shadow-md);
-  transition:
-    background-color var(--transition-fast),
-    transform var(--transition-fast),
-    box-shadow var(--transition-fast);
-}
-
-.retry-btn:hover {
-  background: var(--text-primary);
-  color: var(--bg-dark);
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(229, 234, 242, 0.18);
-}
-
-.retry-btn:active {
-  transform: translateY(0);
-}
-
-/* =========================
+/* =========================================================
    RESPONSIVE
-   ========================= */
-
+   ========================================================= */
 @media (max-width: 767px) {
   .app {
-    padding-top: var(--header-height-mobile);
+    grid-template-rows: var(--header-height-mobile) auto minmax(0, 1fr);
   }
 
+  /* The sidebar becomes a fixed drawer at this width, so the working area is
+     the globe column alone. */
   .main-container {
     flex-direction: column;
-  }
-
-  .error-content {
-    padding: var(--space-8);
-    max-width: 90%;
-  }
-
-  .error-content h1 {
-    font-size: var(--text-2xl);
-  }
-
-  .error-content p {
-    font-size: var(--text-sm);
-  }
-
-  .retry-btn {
-    width: 100%;
   }
 }

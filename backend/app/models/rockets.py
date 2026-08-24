@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Text, Float, Boolean, ForeignKey
+from sqlalchemy import Boolean, Column, Float, ForeignKey, Integer, Text
 from sqlalchemy.orm import relationship
+
 from .base import Base, TimestampMixin
 
 
@@ -13,7 +14,7 @@ class Rocket(Base, TimestampMixin):
     full_name = Column(Text)
     variant = Column(Text)
     description = Column(Text)
-    
+
     # Specifications
     length = Column(Float)  # meters
     diameter = Column(Float)  # meters
@@ -21,10 +22,10 @@ class Rocket(Base, TimestampMixin):
     gto_capacity = Column(Integer)  # kg to GTO
     launch_mass = Column(Integer)  # kg
     thrust = Column(Integer)  # kN
-    
+
     is_reusable = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)
-    
+
     # Manufacturer info
     manufacturer_id = Column(Integer, ForeignKey("agencies.id"))
     manufacturer = relationship("Agency", backref="rockets")

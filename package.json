@@ -9,12 +9,24 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "check": "tsc --noEmit",
-    "release:windows": "powershell -ExecutionPolicy Bypass -File scripts/release-windows.ps1 -DatabaseUrl \"$env:DATABASE_URL\" -CesiumToken \"$env:VITE_CESIUM_ION_ACCESS_TOKEN\"",
+    "lint": "eslint src",
+    "test": "vitest run",
+    "release:windows": "powershell -ExecutionPolicy Bypass -File scripts/release-windows.ps1 -DatabaseUrl \"$env:DATABASE_URL\"",
     "release:windows:local": "powershell -ExecutionPolicy Bypass -File scripts/release-windows.ps1",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
-    "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\""
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,css,json}\"",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "src/**/*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "src/**/*.{css,json}": "prettier --write",
+    "backend/**/*.py": "node scripts/ruff-staged.mjs"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-opener": "^2",
     "cesium": "^1.136.0",
@@ -22,16 +34,26 @@
     "prettier": "^3.7.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "resium": "^1.19.2",
     "zustand": "^5.0.9"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@tauri-apps/cli": "^2",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
     "@vitejs/plugin-react": "^4.6.0",
+    "eslint": "^10.8.1",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.4",
+    "globals": "^17.11.0",
+    "husky": "^9.1.7",
+    "jsdom": "^30.0.1",
+    "lint-staged": "^17.3.0",
     "typescript": "~5.8.3",
+    "typescript-eslint": "^8.67.0",
     "vite": "^7.0.4",
-    "vite-plugin-cesium": "^1.2.23"
+    "vite-plugin-cesium": "^1.2.23",
+    "vitest": "^4.1.10"
   }
 }

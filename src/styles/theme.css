@@ -1,25 +1,222 @@
+/* =========================================================================
+   ROCKETGLOBE — DESIGN TOKENS
+   "Modernist" system: warm near-black ground, a single hot vermilion accent,
+   Archivo throughout, zero corner radius, 2px rules as the structural device.
+
+   This file is the only place a raw colour, size or duration is written.
+   Components reference tokens exclusively, so retuning the system happens
+   here rather than across forty stylesheets.
+
+   The palette is committed to a single dark theme. That is a decision, not
+   an omission: the app is a globe rendered on a dark canvas, and a light
+   ground would leave the pad markers with nothing to sit against. Every
+   colour is therefore declared once, with no media-query variants.
+   ========================================================================= */
+
 /* =========================
-   DESIGN TOKENS
+   ARCHIVO (variable, 100–900)
+   Three unicode subsets, self-hosted from public/fonts.
    ========================= */
+@font-face {
+  font-family: "Archivo";
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("/fonts/archivo-latin.woff2") format("woff2");
+  unicode-range:
+    U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC,
+    U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212,
+    U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: "Archivo";
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("/fonts/archivo-latin-ext.woff2") format("woff2");
+  unicode-range:
+    U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304,
+    U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB,
+    U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+@font-face {
+  font-family: "Archivo";
+  font-style: normal;
+  font-weight: 100 900;
+  font-stretch: 100%;
+  font-display: swap;
+  src: url("/fonts/archivo-vietnamese.woff2") format("woff2");
+  unicode-range:
+    U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1,
+    U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329,
+    U+1EA0-1EF9, U+20AB;
+}
+
 :root {
   /* =========================
-     SPACING SCALE
+     GROUND & SURFACES
+     Warm near-black. The globe pane sits a step darker than the chrome so
+     the canvas reads as a well rather than another panel.
      ========================= */
-  --space-1: 0.25rem; /* 4px */
-  --space-1-5: 0.375rem; /* 6px */
-  --space-2: 0.5rem; /* 8px */
-  --space-2-5: 0.625rem; /* 10px */
-  --space-3: 0.75rem; /* 12px */
-  --space-4: 1rem; /* 16px */
-  --space-5: 1.25rem; /* 20px */
-  --space-6: 1.5rem; /* 24px */
-  --space-8: 2rem; /* 32px */
-  --space-10: 2.5rem; /* 40px */
-  --space-12: 3rem; /* 48px */
-  --space-16: 4rem; /* 64px */
+  --color-bg: #201e1d;
+  --color-bg-well: #14100f;
+  --color-surface: #2d2b2b;
+  --color-surface-raised: #444141;
+  /* Scrim behind the mobile sidebar drawer. */
+  --color-bg-overlay: rgba(10, 8, 8, 0.72);
 
   /* =========================
-     BREAKPOINT TOKENS
+     NEUTRAL RAMP
+     Generated in OKLCH on one shared lightness scale, so the same step of
+     any role matches the others in visual value.
+     ========================= */
+  --color-neutral-100: #f8f4f4;
+  --color-neutral-200: #eae7e7;
+  --color-neutral-300: #d7d3d3;
+  --color-neutral-400: #bab6b6;
+  --color-neutral-500: #9b9797;
+  --color-neutral-600: #7d7979;
+  --color-neutral-700: #605d5d;
+  --color-neutral-800: #444141;
+  --color-neutral-900: #2d2b2b;
+
+  /* =========================
+     ACCENT RAMP — vermilion
+     Carries selection, primary actions, and the pad-activity heat ramp.
+     ========================= */
+  --color-accent: #ec3013;
+  --color-accent-100: #fff2ef;
+  --color-accent-200: #ffe0d9;
+  --color-accent-300: #ffc4b8;
+  --color-accent-400: #ff9783;
+  --color-accent-500: #ff563c;
+  --color-accent-600: #dd2b0f;
+  --color-accent-700: #ae1800;
+  --color-accent-800: #7c1405;
+  --color-accent-900: #4d170e;
+
+  /* =========================
+     TEXT
+     ========================= */
+  --color-text: #f8f4f4;
+  --color-text-2: #d7d3d3;
+  --color-text-3: #bab6b6;
+  --color-text-muted: #9b9797;
+  --color-text-dim: #7d7979;
+
+  /* =========================
+     RULES
+     2px is the structural divider; 1px is for rows inside a list. Rule
+     colour steps with importance: shell > section > row.
+     ========================= */
+  --rule-shell: 2px solid var(--color-neutral-700);
+  --rule-section: 2px solid var(--color-neutral-800);
+  --rule-row: 1px solid var(--color-neutral-800);
+  --rule-accent: 2px solid var(--color-accent);
+
+  --color-divider: var(--color-neutral-800);
+  --color-divider-strong: var(--color-neutral-700);
+
+  /* Selection edge — the 3px bar on an active list row. */
+  --edge-width: 3px;
+
+  /* =========================
+     STATUS
+     Launch outcome is expressed through the accent ramp and neutrals rather
+     than a separate hue set: "lost" is accent-tinted, "flew" is neutral.
+     Anything genuinely semantic (sync failure) uses --color-signal-*.
+     ========================= */
+  --color-signal-live: var(--color-accent-500);
+  --color-signal-warn: var(--color-accent-400);
+  --color-signal-error: var(--color-accent-700);
+  --color-signal-quiet: var(--color-neutral-500);
+
+  /* =========================
+     TYPOGRAPHY
+     One family. Weight and letterspacing carry the hierarchy.
+     ========================= */
+  --font-heading: "Archivo", system-ui, -apple-system, sans-serif;
+  --font-body: "Archivo", system-ui, -apple-system, sans-serif;
+  --font-mono: "Archivo", ui-monospace, monospace;
+  --font-heading-weight: 800;
+
+  /* Modernist scale, under new names. The legacy --text-xs…--text-3xl names
+     keep their original values in the alias block below, so components that
+     haven't been migrated yet do not silently resize. Migrate a component to
+     these --type-* names in the phase that rebuilds it. */
+  --type-kicker: 0.5938rem; /* 9.5px — uppercase micro-label */
+  --type-micro: 0.6875rem; /* 11px */
+  --type-meta: 0.78125rem; /* 12.5px — secondary meta lines */
+  --type-body: 0.8438rem; /* 13.5px — running text */
+  --type-row: 0.9063rem; /* 14.5px — list row titles */
+  --type-stat: 1.0625rem; /* 17px — stat tile values */
+  --type-title: 1.375rem; /* 22px — detail view titles */
+  --type-display: 1.75rem; /* 28px */
+
+  --weight-normal: 400;
+  --weight-medium: 500;
+  --weight-semibold: 600;
+  --weight-bold: 700;
+  --weight-extrabold: 800;
+
+  /* Kicker: the uppercase micro-label used above every value in the system. */
+  --kicker-size: var(--type-kicker);
+  --kicker-tracking: 0.16em;
+
+  --tracking-tight: -0.02em;
+  --tracking-title: -0.012em;
+  --tracking-wide: 0.08em;
+
+  /* =========================
+     SPACING
+     ========================= */
+  --space-1: 0.25rem;
+  --space-1-5: 0.375rem;
+  --space-2: 0.5rem;
+  --space-2-5: 0.625rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* =========================
+     RADIUS — none. The system is hard-edged throughout.
+     ========================= */
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-xl: 0;
+  --radius-2xl: 0;
+  --radius-full: 0;
+
+  /* =========================
+     LAYOUT
+     ========================= */
+  --header-height: 64px;
+  --header-height-mobile: 56px;
+  --header-brand-width: 232px;
+  --sidebar-width: 420px;
+  --sidebar-width-tablet: 360px;
+  --sidebar-width-mobile: 100%;
+  --sidebar-width-min: 320px;
+  --sidebar-width-max: 600px;
+  --timeline-height: 148px;
+  --timeline-height-mobile: 168px;
+  --timeline-active-height: 0px;
+  --legend-width: 208px;
+  --inset-width: 236px;
+  --overlay-gutter: 20px;
+
+  /* =========================
+     BREAKPOINTS
      ========================= */
   --bp-mobile: 768px;
   --bp-tablet: 1024px;
@@ -27,20 +224,7 @@
   --bp-xl: 1536px;
 
   /* =========================
-     LAYOUT TOKENS
-     ========================= */
-  --header-height: 64px;
-  --header-height-mobile: 56px;
-  --sidebar-width: 420px;
-  --sidebar-width-tablet: 360px;
-  --sidebar-width-mobile: 100%;
-  --timeline-height: 120px;
-  --timeline-height-mobile: 140px;
-  --timeline-active-height: 0px;
-  --legend-width: 200px;
-
-  /* =========================
-     Z-INDEX TOKENS
+     Z-INDEX
      ========================= */
   --z-base: 0;
   --z-globe: 1;
@@ -53,115 +237,23 @@
   --z-loading: 1000;
 
   /* =========================
-     COLORS - BACKGROUND
+     ELEVATION
+     Flat system: depth comes from the rule and the ground step, not blur.
+     Shadows stay for the few genuinely floating things (dialogs).
      ========================= */
-  --bg-space: #0a0c0f;
-  --bg-dark: #0e1115;
-  --bg-surface: #14181e;
-  --bg-elevated: rgba(20, 24, 30, 0.92);
-  --bg-card: rgba(20, 24, 30, 0.92);
-  --bg-card-hover: rgba(26, 31, 38, 0.96);
-  --bg-input: rgba(18, 22, 28, 0.94);
-  --bg-hover: rgba(26, 31, 38, 0.96);
-  --bg-overlay: rgba(7, 9, 12, 0.82);
-
-  /* =========================
-     COLORS - TEXT
-     ========================= */
-  --text-primary: #e5e9ef;
-  --text-secondary: #c3cad4;
-  --text-tertiary: #9aa4b1;
-  --text-muted: #7d8898;
-  --text-dim: #687484;
-  --text-disabled: #556171;
-
-  /* =========================
-     COLORS - BORDERS
-     ========================= */
-  --border-subtle: rgba(229, 234, 242, 0.08);
-  --border-normal: rgba(229, 234, 242, 0.15);
-  --border-bright: rgba(229, 234, 242, 0.22);
-  --border-focus: rgba(229, 234, 242, 0.3);
-
-  /* =========================
-     ACCENT COLORS
-     ========================= */
-  --accent-blue: #c6ccd5;
-  --accent-blue-bright: #d3d9e1;
-  --accent-blue-dark: #a9b1bd;
-  --accent-blue-hover: #ced4dd;
-  --accent-green: #c3c9d2;
-  --accent-yellow: #c7cdd5;
-  --accent-orange: #c2c9d2;
-  --accent-red: #c1c8d1;
-  --accent-purple: #bfc6d0;
-  --accent-cyan: #c8ced7;
-  --accent-lime: #c4cad3;
-
-  /* =========================
-     STATUS COLORS
-     ========================= */
-  --status-success: #c5cbd4;
-  --status-warning: #c4cbd4;
-  --status-error: #c3cad3;
-  --status-info: #c8ced7;
-
-  /* =========================
-     GLASS TOKENS
-     ========================= */
-  --glass-bg: rgba(16, 20, 27, 0.84);
-  --glass-strong: rgba(16, 20, 27, 0.94);
-  --glass-border: rgba(229, 234, 242, 0.11);
-  --glass-highlight: rgba(229, 234, 242, 0.025);
-  --glass-shadow: 0 8px 24px rgba(0, 0, 0, 0.34);
-  --glass-blur: 8px;
-
-  /* =========================
-     TYPOGRAPHY
-     ========================= */
-  --font-sans: "Bahnschrift", "Aptos", "Segoe UI Variable", "Trebuchet MS", sans-serif;
-  --font-mono: "Cascadia Mono", "Cascadia Code", "JetBrains Mono", "Consolas", monospace;
-
-  --text-xs: 0.75rem; /* 12px */
-  --text-sm: 0.875rem; /* 14px */
-  --text-base: 1rem; /* 16px */
-  --text-lg: 1.125rem; /* 18px */
-  --text-xl: 1.25rem; /* 20px */
-  --text-2xl: 1.5rem; /* 24px */
-  --text-3xl: 1.875rem; /* 30px */
-
-  --weight-normal: 400;
-  --weight-medium: 500;
-  --weight-semibold: 600;
-  --weight-bold: 700;
-  --weight-extrabold: 800;
-
-  /* =========================
-     BORDER RADIUS
-     ========================= */
-  --radius-sm: 0.25rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-2xl: 1.5rem;
-  --radius-full: 9999px;
-
-  /* =========================
-     TRANSITIONS
-     ========================= */
-  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-slow: 300ms cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-spring: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
-
-  /* =========================
-     SHADOWS
-     ========================= */
-  --shadow-xs: 0 1px 1px rgba(0, 0, 0, 0.28);
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.34);
-  --shadow-md: 0 6px 12px -5px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 12px 20px -10px rgba(0, 0, 0, 0.42);
-  --shadow-xl: 0 18px 28px -14px rgba(0, 0, 0, 0.46);
-  --shadow-2xl: 0 24px 36px -18px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 3px 10px rgba(0, 0, 0, 0.38);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.44);
+  --shadow-xl: 0 18px 40px rgba(0, 0, 0, 0.48);
+  --shadow-2xl: 0 24px 48px rgba(0, 0, 0, 0.52);
   --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+
+  /* =========================
+     MOTION
+     ========================= */
+  --transition-fast: 120ms cubic-bezier(0.2, 0, 0.2, 1);
+  --transition-base: 180ms cubic-bezier(0.2, 0, 0.2, 1);
+  --transition-slow: 280ms cubic-bezier(0.2, 0, 0.2, 1);
+  --transition-spring: 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
 }

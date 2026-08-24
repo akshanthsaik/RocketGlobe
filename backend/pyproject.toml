@@ -1,6 +1,12 @@
 [tool.ruff]
 line-length = 120
 target-version = "py312"
+extend-exclude = [
+    "alembic",
+    "venv",
+    ".venv",
+    "__pycache__",
+]
 
 [tool.ruff.lint]
 select = [

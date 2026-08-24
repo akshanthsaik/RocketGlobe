@@ -1,15 +1,22 @@
-from sqlalchemy.orm import Session
-from datetime import datetime, timedelta, timezone
-from typing import Optional
 import logging
+from datetime import datetime, timedelta, timezone
+from typing import Callable, Optional
 from urllib.parse import parse_qs, urlparse
 
+from sqlalchemy.orm import Session
+
 from app.config import settings
+from app.models import Agency, Launch, Pad, Rocket
 from app.services.ll2_client import LL2Client, LL2RateLimitError
-from app.services.sync_state import get_last_sync, set_last_sync
 from app.services.sync_lock import acquire_sync_lock, release_sync_lock
-from app.services.sync_run import complete_sync_run, fail_sync_run, update_sync_run
-from app.models import Agency, Pad, Rocket, Launch, SyncRun
+from app.services.sync_run import (
+    complete_sync_run,
+    fail_sync_run,
+    get_launch_rate_limit_cooldown_seconds,
+    update_sync_run,
+)
+from app.services.sync_state import get_last_sync, set_last_sync
+from app.utils.time import normalize_utc
 
 logger = logging.getLogger(__name__)
 SYNC_RESOURCES = ("agencies", "pads", "rockets", "launches")
@@ -110,19 +117,11 @@ def _touch_sync_run(
         update_sync_run(db, run_id, **payload)
 
 
-def _normalize_utc(value: Optional[datetime]) -> Optional[datetime]:
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value
-
-
 def _should_skip_static_resource(db: Session, resource_name: str) -> bool:
     if resource_name == "launches":
         return False
 
-    last_sync = _normalize_utc(get_last_sync(db, resource_name))
+    last_sync = normalize_utc(get_last_sync(db, resource_name))
     if last_sync is None:
         return False
 
@@ -135,7 +134,7 @@ def _resolve_incremental_baseline(
     resource_name: str,
     model_cls,
 ) -> Optional[datetime]:
-    last_sync = _normalize_utc(get_last_sync(db, resource_name))
+    last_sync = normalize_utc(get_last_sync(db, resource_name))
     if last_sync:
         return last_sync
 
@@ -149,9 +148,7 @@ def _resolve_incremental_baseline(
         # incremental recovery under LL2 rate limits.
         lookback_hours = min(lookback_hours, 6)
 
-    fallback = datetime.now(timezone.utc) - timedelta(
-        hours=lookback_hours
-    )
+    fallback = datetime.now(timezone.utc) - timedelta(hours=lookback_hours)
     logger.info(
         "No sync_state baseline for %s but local data exists; using fallback updated__gte=%s (%sh lookback)",
         resource_name,
@@ -161,56 +158,27 @@ def _resolve_incremental_baseline(
     return fallback
 
 
-def _recent_launch_rate_limit_remaining(
+async def sync_agencies(
+    client: LL2Client,
     db: Session,
-    current_run_id: Optional[str],
-) -> Optional[int]:
-    recent_runs = (
-        db.query(SyncRun)
-        .filter(SyncRun.run_id != current_run_id)
-        .order_by(SyncRun.started_at.desc())
-        .limit(10)
-        .all()
-    )
+    run_id: Optional[str] = None,
+    start_offset: int = 0,
+    on_page: Optional[Callable[[str, Optional[int]], None]] = None,
+) -> int:
+    """Incremental sync for agencies from LL2 to database using bulk upserts.
 
-    now = datetime.now(timezone.utc)
-    for run in recent_runs:
-        stats = run.stats if isinstance(run.stats, dict) else {}
-        rate_limited = stats.get("_rate_limited")
-        if not isinstance(rate_limited, dict):
-            continue
-
-        raw_wait = rate_limited.get("launches")
-        try:
-            wait_seconds = int(float(raw_wait))
-        except (TypeError, ValueError):
-            continue
-
-        if wait_seconds <= 0:
-            continue
-        # Normalize legacy runs that may have stored very large server windows.
-        wait_seconds = min(wait_seconds, settings.LL2_LAUNCHES_MAX_WAIT_SECONDS)
-
-        baseline = _normalize_utc(run.finished_at or run.updated_at or run.started_at)
-        if baseline is None:
-            continue
-
-        elapsed = (now - baseline).total_seconds()
-        remaining = int(round(wait_seconds - elapsed))
-        if remaining > 0:
-            return remaining
-
-    return None
-
-
-async def sync_agencies(client: LL2Client, db: Session, run_id: Optional[str] = None) -> int:
-    """Incremental sync for agencies from LL2 to database using bulk upserts."""
+    `start_offset`/`on_page` let a caller resume a long-running full crawl (e.g. the
+    seed-snapshot tool) from a checkpoint instead of restarting at offset 0.
+    """
     logger.info("Syncing agencies (incremental)...")
     count = 0
-    offset = 0
+    offset = start_offset
     limit = settings.LL2_SYNC_PAGE_LIMIT
 
-    last_sync = _resolve_incremental_baseline(db, "agencies", Agency)
+    # A resumed crawl (start_offset set) already has partial rows with no SyncState
+    # bookmark yet - that's not "lost state", it's mid-crawl. Don't let the fallback
+    # lookback window truncate the rest of a full historical crawl to "last 24h".
+    last_sync = None if start_offset else _resolve_incremental_baseline(db, "agencies", Agency)
 
     max_seen_ts = None
 
@@ -302,6 +270,8 @@ async def sync_agencies(client: LL2Client, db: Session, run_id: Optional[str] = 
 
         # Advance offset and check completion
         next_offset = _get_next_offset(data, offset, limit, len(results))
+        if on_page:
+            on_page("agencies", next_offset)
         if next_offset is None:
             break
         offset = next_offset
@@ -317,14 +287,20 @@ async def sync_agencies(client: LL2Client, db: Session, run_id: Optional[str] = 
     return count
 
 
-async def sync_pads(client: LL2Client, db: Session, run_id: Optional[str] = None) -> int:
-    """Incremental sync for pads using bulk upserts. After bulk insert we update `location` in Postgres using PostGIS functions in a single UPDATE statement."""
+async def sync_pads(
+    client: LL2Client,
+    db: Session,
+    run_id: Optional[str] = None,
+    start_offset: int = 0,
+    on_page: Optional[Callable[[str, Optional[int]], None]] = None,
+) -> int:
+    """Incremental sync for pads using bulk upserts."""
     logger.info("Syncing pads (incremental)...")
     count = 0
-    offset = 0
+    offset = start_offset
     limit = settings.LL2_SYNC_PAGE_LIMIT
 
-    last_sync = _resolve_incremental_baseline(db, "pads", Pad)
+    last_sync = None if start_offset else _resolve_incremental_baseline(db, "pads", Pad)
 
     max_seen_ts = None
 
@@ -353,7 +329,6 @@ async def sync_pads(client: LL2Client, db: Session, run_id: Optional[str] = None
 
         insert_mappings = []
         update_mappings = []
-        changed_ll2_ids = set()
 
         for item in results:
             item_id = item.get("id")
@@ -408,7 +383,6 @@ async def sync_pads(client: LL2Client, db: Session, run_id: Optional[str] = None
             else:
                 insert_mappings.append(mapping)
 
-            changed_ll2_ids.add(item_id)
             count += 1
 
         if insert_mappings:
@@ -418,24 +392,9 @@ async def sync_pads(client: LL2Client, db: Session, run_id: Optional[str] = None
 
         db.commit()
 
-        # If we're running on Postgres, update the geography column using a single UPDATE statement
-        try:
-            dialect_name = db.bind.dialect.name
-        except Exception:
-            dialect_name = None
-
-        if dialect_name == 'postgresql' and changed_ll2_ids:
-            rows = db.query(Pad).filter(Pad.ll2_id.in_(list(changed_ll2_ids))).all()
-            changed_ids = [r.id for r in rows]
-            if changed_ids:
-                from geoalchemy2.functions import ST_SetSRID, ST_MakePoint
-                db.query(Pad).filter(Pad.id.in_(changed_ids)).update(
-                    {Pad.location: ST_SetSRID(ST_MakePoint(Pad.longitude, Pad.latitude), 4326)},
-                    synchronize_session=False,
-                )
-                db.commit()
-
         next_offset = _get_next_offset(data, offset, limit, len(results))
+        if on_page:
+            on_page("pads", next_offset)
         if next_offset is None:
             break
         offset = next_offset
@@ -449,14 +408,20 @@ async def sync_pads(client: LL2Client, db: Session, run_id: Optional[str] = None
     return count
 
 
-async def sync_rockets(client: LL2Client, db: Session, run_id: Optional[str] = None) -> int:
+async def sync_rockets(
+    client: LL2Client,
+    db: Session,
+    run_id: Optional[str] = None,
+    start_offset: int = 0,
+    on_page: Optional[Callable[[str, Optional[int]], None]] = None,
+) -> int:
     """Incremental sync for rockets using bulk upserts and prefetching manufacturers."""
     logger.info("Syncing rockets (incremental)...")
     count = 0
-    offset = 0
+    offset = start_offset
     limit = settings.LL2_SYNC_PAGE_LIMIT
 
-    last_sync = _resolve_incremental_baseline(db, "rockets", Rocket)
+    last_sync = None if start_offset else _resolve_incremental_baseline(db, "rockets", Rocket)
 
     max_seen_ts = None
 
@@ -553,6 +518,8 @@ async def sync_rockets(client: LL2Client, db: Session, run_id: Optional[str] = N
 
         db.commit()
         next_offset = _get_next_offset(data, offset, limit, len(results))
+        if on_page:
+            on_page("rockets", next_offset)
         if next_offset is None:
             break
         offset = next_offset
@@ -566,27 +533,33 @@ async def sync_rockets(client: LL2Client, db: Session, run_id: Optional[str] = N
     return count
 
 
-async def sync_launches(client: LL2Client, db: Session, run_id: Optional[str] = None) -> int:
+async def sync_launches(
+    client: LL2Client,
+    db: Session,
+    run_id: Optional[str] = None,
+    start_offset: int = 0,
+    on_page: Optional[Callable[[str, Optional[int]], None]] = None,
+) -> int:
     """Incremental sync for launches using bulk upserts and prefetch of related objects."""
     logger.info("Syncing launches (incremental)...")
     count = 0
-    offset = 0
+    offset = start_offset
     limit = settings.LL2_SYNC_PAGE_LIMIT
 
     # Launches are the heaviest resource. Use a more tolerant request budget so
     # rate-limit bursts don't fail the entire sync too aggressively.
-    original_min_interval = client._min_request_interval
-    original_base_min_interval = client._base_min_request_interval
+    original_min_interval = client.min_request_interval
+    original_base_min_interval = client.base_min_request_interval
     original_max_retries = client.max_retries
     original_max_wait_seconds = client.max_wait_seconds
     original_max_request_duration = client.max_request_duration
 
-    client._base_min_request_interval = max(
-        client._base_min_request_interval,
+    client.base_min_request_interval = max(
+        client.base_min_request_interval,
         settings.LL2_LAUNCHES_MIN_REQUEST_INTERVAL,
     )
-    client._min_request_interval = max(
-        client._min_request_interval,
+    client.min_request_interval = max(
+        client.min_request_interval,
         settings.LL2_LAUNCHES_MIN_REQUEST_INTERVAL,
     )
     client.max_retries = max(client.max_retries, settings.LL2_LAUNCHES_MAX_RETRIES)
@@ -601,13 +574,13 @@ async def sync_launches(client: LL2Client, db: Session, run_id: Optional[str] = 
 
     logger.info(
         "Launches sync request budget: min_interval=%.2fs retries=%s max_wait=%ss max_duration=%ss",
-        client._min_request_interval,
+        client.min_request_interval,
         client.max_retries,
         client.max_wait_seconds,
         client.max_request_duration,
     )
 
-    last_sync = _resolve_incremental_baseline(db, "launches", Launch)
+    last_sync = None if start_offset else _resolve_incremental_baseline(db, "launches", Launch)
 
     max_seen_ts = None
 
@@ -731,11 +704,12 @@ async def sync_launches(client: LL2Client, db: Session, run_id: Optional[str] = 
                 if isinstance(lsp, dict) and lsp.get("id") and agencies_map.get(lsp.get("id")):
                     mapping["agency_id"] = agencies_map.get(lsp.get("id"))
 
+                mapping["raw_data"] = item
+
                 if item_id in existing:
                     mapping["id"] = existing[item_id].id
                     update_mappings.append(mapping)
                 else:
-                    mapping["raw_data"] = item
                     insert_mappings.append(mapping)
 
                 count += 1
@@ -747,6 +721,8 @@ async def sync_launches(client: LL2Client, db: Session, run_id: Optional[str] = 
 
             db.commit()
             next_offset = _get_next_offset(data, offset, limit, len(results))
+            if on_page:
+                on_page("launches", next_offset)
             if next_offset is None:
                 break
             offset = next_offset
@@ -759,12 +735,11 @@ async def sync_launches(client: LL2Client, db: Session, run_id: Optional[str] = 
         logger.info(f"Synced {count} launches (incremental)")
         return count
     finally:
-        client._min_request_interval = original_min_interval
-        client._base_min_request_interval = original_base_min_interval
+        client.min_request_interval = original_min_interval
+        client.base_min_request_interval = original_base_min_interval
         client.max_retries = original_max_retries
         client.max_wait_seconds = original_max_wait_seconds
         client.max_request_duration = original_max_request_duration
-
 
 
 async def sync_all(db: Session, run_id: Optional[str] = None) -> dict:
@@ -841,7 +816,7 @@ async def sync_all(db: Session, run_id: Optional[str] = None) -> dict:
                 continue
 
             if resource_name == "launches":
-                remaining_rate_limit = _recent_launch_rate_limit_remaining(db, run_id)
+                remaining_rate_limit = get_launch_rate_limit_cooldown_seconds(db, exclude_run_id=run_id)
                 if remaining_rate_limit:
                     skipped_resources.append("launches:rate_limit_cooldown")
                     rate_limited_resources["launches"] = remaining_rate_limit
@@ -849,10 +824,7 @@ async def sync_all(db: Session, run_id: Optional[str] = None) -> dict:
                         db,
                         run_id,
                         current_resource=resource_name,
-                        message=(
-                            f"Skipping launches: LL2 cooldown active "
-                            f"({remaining_rate_limit}s remaining)"
-                        ),
+                        message=(f"Skipping launches: LL2 cooldown active ({remaining_rate_limit}s remaining)"),
                         progress_done=index,
                         progress_total=len(resources),
                         stats={
@@ -904,9 +876,7 @@ async def sync_all(db: Session, run_id: Optional[str] = None) -> dict:
                 if resource_name == "launches":
                     # Keep a short fallback baseline so retry runs do not request an
                     # overly large launch delta while LL2 is throttling us.
-                    fallback = datetime.now(timezone.utc) - timedelta(
-                        hours=1
-                    )
+                    fallback = datetime.now(timezone.utc) - timedelta(hours=1)
                     set_last_sync(db, "launches", fallback)
 
                 _touch_sync_run(
@@ -914,8 +884,7 @@ async def sync_all(db: Session, run_id: Optional[str] = None) -> dict:
                     run_id,
                     current_resource=resource_name,
                     message=(
-                        f"Skipped {resource_name}: LL2 rate-limited "
-                        f"({rate_limit_error.wait_seconds:.0f}s window)"
+                        f"Skipped {resource_name}: LL2 rate-limited ({rate_limit_error.wait_seconds:.0f}s window)"
                     ),
                     progress_done=index,
                     progress_total=len(resources),

@@ -1,6 +1,10 @@
 use std::path::PathBuf;
 use std::process::{Child, Command};
 use std::sync::Mutex;
+#[cfg(debug_assertions)]
+use std::net::{SocketAddr, TcpStream};
+#[cfg(debug_assertions)]
+use std::time::Duration;
 
 use tauri::path::BaseDirectory;
 use tauri::{AppHandle, Manager};
@@ -14,13 +18,6 @@ use std::os::windows::process::CommandExt;
 #[cfg(all(target_os = "windows", not(debug_assertions)))]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
 
-#[cfg_attr(debug_assertions, allow(dead_code))]
-const PG_PORT: &str = "5433";
-#[cfg_attr(debug_assertions, allow(dead_code))]
-const PG_USER: &str = "rocketglobe";
-#[cfg_attr(debug_assertions, allow(dead_code))]
-const PG_DB: &str = "rocketglobe";
-
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}!", name)
@@ -28,14 +25,12 @@ fn greet(name: &str) -> String {
 
 struct BackendState {
     backend: Mutex<Option<Child>>,
-    postgres: Mutex<Option<PostgresRuntime>>,
 }
 
 impl Default for BackendState {
     fn default() -> Self {
         Self {
             backend: Mutex::new(None),
-            postgres: Mutex::new(None),
         }
     }
 }
@@ -48,6 +43,23 @@ fn env_flag(name: &str) -> bool {
         ),
         Err(_) => false,
     }
+}
+
+fn env_optional(name: &str) -> Option<String> {
+    std::env::var(name)
+        .ok()
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+}
+
+/// If something is already listening on the API port, skip spawning a second uvicorn in dev.
+#[cfg(debug_assertions)]
+fn local_backend_port_in_use() -> bool {
+    let addr: SocketAddr = match "127.0.0.1:8000".parse() {
+        Ok(a) => a,
+        Err(_) => return false,
+    };
+    TcpStream::connect_timeout(&addr, Duration::from_millis(200)).is_ok()
 }
 
 fn resolve_backend_dir(app: &AppHandle) -> Result<PathBuf, String> {
@@ -86,204 +98,32 @@ fn resolve_python(backend_dir: &Path) -> Result<PathBuf, String> {
     ))
 }
 
-#[cfg_attr(debug_assertions, allow(dead_code))]
-struct PostgresRuntime {
-    pg_ctl: PathBuf,
-    data_dir: PathBuf,
-}
-
+/// Release mode stores its SQLite DB as a single file under the app's local data dir,
+/// so each user gets their own persistent local copy that survives app updates.
 #[cfg(not(debug_assertions))]
-fn init_postgres(app: &AppHandle) -> Result<(PostgresRuntime, String), String> {
+fn resolve_release_database_url(app: &AppHandle) -> Result<String, String> {
     let app_data = app.path().app_local_data_dir().map_err(|e| e.to_string())?;
-
     std::fs::create_dir_all(&app_data).map_err(|e| e.to_string())?;
 
-    let data_dir = app_data.join("pgdata");
-    let pg_version = data_dir.join("PG_VERSION");
+    let db_path = app_data.join("rocketglobe.db");
+    // SQLite URLs are file paths, not host paths - forward slashes work on Windows too.
+    let db_path_str = db_path.to_string_lossy().replace('\\', "/");
 
-    let backend_dir = resolve_backend_dir(app)?;
-    let mut postgres_candidates: Vec<PathBuf> = Vec::new();
-
-    if let Ok(path) = app.path().resolve("postgres/bin", BaseDirectory::Resource) {
-        postgres_candidates.push(path);
-    }
-    postgres_candidates.push(backend_dir.join("postgres").join("bin"));
-    if let Some(parent) = backend_dir.parent() {
-        postgres_candidates.push(parent.join("postgres").join("bin"));
-    }
-
-    let postgres_bin = postgres_candidates
-        .into_iter()
-        .find(|candidate| candidate.join("pg_ctl.exe").exists())
-        .ok_or_else(|| {
-            "Bundled postgres bin not found in resources (expected postgres/bin with pg_ctl.exe)"
-                .to_string()
-        })?;
-
-    let initdb = postgres_bin.join("initdb.exe");
-    let pg_ctl = postgres_bin.join("pg_ctl.exe");
-    let createdb = postgres_bin.join("createdb.exe");
-    let psql = postgres_bin.join("psql.exe");
-    let postgres_root = postgres_bin
-        .parent()
-        .ok_or_else(|| "Unable to resolve postgres root directory".to_string())?;
-    let share_dir = postgres_root.join("share");
-    let share_bki = share_dir.join("postgres.bki");
-
-    if !initdb.exists() {
-        return Err(format!("Bundled initdb not found at {:?}", initdb));
-    }
-    if !pg_ctl.exists() {
-        return Err(format!("Bundled pg_ctl not found at {:?}", pg_ctl));
-    }
-    if !createdb.exists() {
-        return Err(format!("Bundled createdb not found at {:?}", createdb));
-    }
-    if !psql.exists() {
-        return Err(format!("Bundled psql not found at {:?}", psql));
-    }
-    if !share_bki.exists() {
-        return Err(format!(
-            "Bundled postgres share files not found at {:?}. Expected postgres/share/postgres.bki",
-            share_bki
-        ));
-    }
-
-    // Recover from partially initialized clusters (for example from a prior failed install).
-    if data_dir.exists() && !pg_version.exists() {
-        std::fs::remove_dir_all(&data_dir).map_err(|e| {
-            format!(
-                "Failed to clean partial postgres data directory {:?}: {}",
-                data_dir, e
-            )
-        })?;
-    }
-
-    if !data_dir.exists() {
-        std::fs::create_dir_all(&data_dir).map_err(|e| e.to_string())?;
-    }
-
-    if !pg_version.exists() {
-        let init_output = Command::new(&initdb)
-            .arg("-D")
-            .arg(&data_dir)
-            .arg("-U")
-            .arg(PG_USER)
-            .arg("-A")
-            .arg("trust")
-            .arg("-L")
-            .arg(&share_dir)
-            .output()
-            .map_err(|e| e.to_string())?;
-
-        if !init_output.status.success() {
-            return Err(format!(
-                "initdb failed: {}",
-                String::from_utf8_lossy(&init_output.stderr).trim()
-            ));
-        }
-    }
-
-    let mut start = Command::new(&pg_ctl);
-    start.arg("-D")
-        .arg(&data_dir)
-        .arg("-o")
-        .arg(format!("-p {}", PG_PORT))
-        .arg("start")
-        .arg("-w");
-
-    #[cfg(target_os = "windows")]
-    start.creation_flags(CREATE_NO_WINDOW);
-
-    let start_output = start.output().map_err(|e| e.to_string())?;
-    if !start_output.status.success() {
-        let stderr = String::from_utf8_lossy(&start_output.stderr).trim().to_string();
-        let stdout = String::from_utf8_lossy(&start_output.stdout).trim().to_string();
-        return Err(format!(
-            "pg_ctl start failed (stdout='{}', stderr='{}')",
-            stdout, stderr
-        ));
-    }
-
-    let mut exists_cmd = Command::new(&psql);
-    exists_cmd
-        .arg("-p")
-        .arg(PG_PORT)
-        .arg("-U")
-        .arg(PG_USER)
-        .arg("-d")
-        .arg("postgres")
-        .arg("-tAc")
-        .arg(format!(
-            "SELECT 1 FROM pg_database WHERE datname='{}';",
-            PG_DB
-        ));
-
-    #[cfg(target_os = "windows")]
-    exists_cmd.creation_flags(CREATE_NO_WINDOW);
-
-    let exists_output = exists_cmd.output().map_err(|e| e.to_string())?;
-    if !exists_output.status.success() {
-        return Err(format!(
-            "psql database existence check failed: {}",
-            String::from_utf8_lossy(&exists_output.stderr).trim()
-        ));
-    }
-
-    let exists = String::from_utf8_lossy(&exists_output.stdout).trim() == "1";
-    if !exists {
-        let mut createdb_cmd = Command::new(&createdb);
-        createdb_cmd
-            .arg("-p")
-            .arg(PG_PORT)
-            .arg("-U")
-            .arg(PG_USER)
-            .arg("-w")
-            .arg(PG_DB);
-
-        #[cfg(target_os = "windows")]
-        createdb_cmd.creation_flags(CREATE_NO_WINDOW);
-
-        let createdb_output = createdb_cmd.output().map_err(|e| e.to_string())?;
-        if !createdb_output.status.success() {
-            return Err(format!(
-                "createdb failed: {}",
-                String::from_utf8_lossy(&createdb_output.stderr).trim()
-            ));
-        }
-    }
-
-    let database_url = format!("postgresql://{}@127.0.0.1:{}/{}", PG_USER, PG_PORT, PG_DB);
-
-    Ok((PostgresRuntime { pg_ctl, data_dir }, database_url))
+    Ok(format!("sqlite:///{}", db_path_str))
 }
 
-#[cfg(not(debug_assertions))]
-fn stop_postgres(runtime: &PostgresRuntime) -> Result<(), String> {
-    let mut stop = Command::new(&runtime.pg_ctl);
-    stop.arg("-D")
-        .arg(&runtime.data_dir)
-        .arg("stop")
-        .arg("-m")
-        .arg("fast")
-        .arg("-w");
-
-    #[cfg(target_os = "windows")]
-    stop.creation_flags(CREATE_NO_WINDOW);
-
-    let status = stop.status().map_err(|e| e.to_string())?;
-    if !status.success() {
-        return Err("pg_ctl stop failed".into());
-    }
-
-    Ok(())
-}
-
-fn spawn_backend(app: &AppHandle) -> Result<(Child, Option<PostgresRuntime>), String> {
+fn spawn_backend(app: &AppHandle) -> Result<Option<Child>, String> {
     let backend_dir = resolve_backend_dir(app)?;
 
     #[cfg(debug_assertions)]
     {
+        if !env_flag("ROCKETGLOBE_FORCE_SPAWN_BACKEND") && local_backend_port_in_use() {
+            eprintln!(
+                "rocketglobe: 127.0.0.1:8000 is in use; skipping embedded uvicorn (use your own backend or set ROCKETGLOBE_FORCE_SPAWN_BACKEND=1)"
+            );
+            return Ok(None);
+        }
+
         let python = resolve_python(&backend_dir)?;
 
         let mut cmd = Command::new(python);
@@ -296,13 +136,17 @@ fn spawn_backend(app: &AppHandle) -> Result<(Child, Option<PostgresRuntime>), St
             .arg("--port")
             .arg("8000");
 
+        if let Some(admin_token) = env_optional("VITE_ADMIN_TOKEN") {
+            cmd.env("ADMIN_TOKEN", admin_token);
+        }
+
         let child = cmd.spawn().map_err(|e| e.to_string())?;
-        return Ok((child, None));
+        return Ok(Some(child));
     }
 
     #[cfg(not(debug_assertions))]
     {
-        let (pg_runtime, database_url) = init_postgres(app)?;
+        let database_url = resolve_release_database_url(app)?;
 
         let backend_exe = backend_dir.join("run_backend.exe");
 
@@ -318,13 +162,16 @@ fn spawn_backend(app: &AppHandle) -> Result<(Child, Option<PostgresRuntime>), St
         cmd.env("DATABASE_URL", database_url);
         cmd.env("API_HOST", "127.0.0.1");
         cmd.env("API_PORT", "8000");
+        if let Some(admin_token) = env_optional("VITE_ADMIN_TOKEN") {
+            cmd.env("ADMIN_TOKEN", admin_token);
+        }
 
         #[cfg(target_os = "windows")]
         cmd.creation_flags(CREATE_NO_WINDOW);
 
         let backend_child = cmd.spawn().map_err(|e| e.to_string())?;
 
-        return Ok((backend_child, Some(pg_runtime)));
+        return Ok(Some(backend_child));
     }
 }
 
@@ -337,11 +184,10 @@ pub fn run() {
                 return Ok(());
             }
 
-            let (backend_child, pg_child) = spawn_backend(&app.handle())?;
+            let backend_child = spawn_backend(&app.handle())?;
 
             let state = app.state::<BackendState>();
-            *state.backend.lock().unwrap() = Some(backend_child);
-            *state.postgres.lock().unwrap() = pg_child;
+            *state.backend.lock().unwrap() = backend_child;
 
             Ok(())
         })
@@ -360,17 +206,6 @@ pub fn run() {
                 if let Some(mut backend) = backend_child {
                     let _ = backend.kill();
                     let _ = backend.wait();
-                }
-
-                // Kill postgres
-                let postgres_child = {
-                    let mut guard = state.postgres.lock().unwrap();
-                    guard.take()
-                };
-
-                if let Some(_pg) = postgres_child {
-                    #[cfg(not(debug_assertions))]
-                    let _ = stop_postgres(&_pg);
                 }
             }
         })

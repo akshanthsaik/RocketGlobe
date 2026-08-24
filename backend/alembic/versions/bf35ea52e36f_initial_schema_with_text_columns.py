@@ -8,7 +8,6 @@ Create Date: 2025-12-16 17:30:52.196429
 from typing import Sequence, Union
 
 from alembic import op
-from geoalchemy2 import Geography
 import sqlalchemy as sa
 
 
@@ -49,7 +48,6 @@ def upgrade() -> None:
         sa.Column("name", sa.Text(), nullable=False),
         sa.Column("latitude", sa.Float(), nullable=False),
         sa.Column("longitude", sa.Float(), nullable=False),
-        sa.Column("location", Geography(geometry_type="POINT", srid=4326), nullable=True),
         sa.Column("country_code", sa.Text(), nullable=True),
         sa.Column("map_url", sa.Text(), nullable=True),
         sa.Column("total_launch_count", sa.Integer(), nullable=True),

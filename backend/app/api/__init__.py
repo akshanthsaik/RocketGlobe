@@ -1,7 +1,8 @@
 from fastapi import APIRouter
+
+from .agencies import router as agencies_router
 from .launches import router as launches_router
 from .pads import router as pads_router
-from .agencies import router as agencies_router
 from .rockets import router as rockets_router
 
 api_router = APIRouter()

@@ -1,0 +1,95 @@
+/* =========================================================
+   STARTUP NOTICE
+   A panel over the centre of the shell, not a takeover — the
+   header and chrome stay visible and readable behind it.
+   ========================================================= */
+.startup-notice {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: var(--z-loading);
+  width: min(420px, calc(100vw - 2 * var(--space-8)));
+  padding: 22px 24px;
+  background: var(--color-bg);
+  border: 2px solid var(--color-neutral-800);
+  box-shadow: var(--shadow-lg);
+}
+
+.startup-notice.error {
+  border-color: var(--color-accent-700);
+}
+
+.startup-rule {
+  width: 28px;
+  height: 2px;
+  margin-bottom: 16px;
+  background: var(--color-accent);
+}
+
+.startup-kicker {
+  margin-bottom: 5px;
+  font-size: var(--type-kicker);
+  letter-spacing: var(--kicker-tracking);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.startup-notice.error .startup-kicker {
+  color: var(--color-accent-400);
+}
+
+.startup-title {
+  margin: 0 0 8px;
+  font-family: var(--font-heading);
+  font-weight: var(--weight-extrabold);
+  font-size: var(--type-title);
+  line-height: 1.12;
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-text);
+  text-wrap: balance;
+}
+
+.startup-text {
+  margin: 0;
+  font-size: var(--type-body);
+  line-height: 1.55;
+  color: var(--color-text-3);
+}
+
+/* The raw failure, kept but demoted — useful when reporting a problem,
+   noise while reading the explanation above it. */
+.startup-detail {
+  margin: 12px 0 0;
+  padding: 9px 11px;
+  background: var(--color-surface);
+  border-left: var(--edge-width) solid var(--color-neutral-800);
+  font-size: var(--type-micro);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.startup-retry {
+  margin-top: 16px;
+  padding: 9px 16px;
+  background: var(--color-accent);
+  border: 2px solid var(--color-accent);
+  border-radius: 0;
+  color: var(--color-neutral-100);
+  font-family: var(--font-heading);
+  font-size: var(--type-meta);
+  font-weight: var(--weight-extrabold);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.startup-retry:hover {
+  background: var(--color-accent-600);
+}
+
+@media (max-width: 640px) {
+  .startup-notice {
+    padding: 18px 18px;
+  }
+}

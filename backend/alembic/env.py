@@ -23,19 +23,6 @@ if config.config_file_name is not None:
 
 target_metadata = Base.metadata
 
-def include_object(object, name, type_, reflected, compare_to):
-    """
-    Exclude PostGIS system tables/views from Alembic.
-    """
-    if type_ == "table" and name in (
-        "spatial_ref_sys",
-        "geometry_columns",
-        "geography_columns",
-        "raster_columns",
-        "raster_overviews",
-    ):
-        return False
-    return True
 
 def run_migrations_offline() -> None:
     url = config.get_main_option("sqlalchemy.url")
@@ -44,7 +31,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
-        include_object=include_object,
+        render_as_batch=url.startswith("sqlite"),
     )
 
     with context.begin_transaction():
@@ -58,10 +45,12 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
+        # render_as_batch: SQLite can't ALTER/DROP columns in place, so Alembic
+        # rebuilds the table via a temp-table copy for any future migrations.
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
-            include_object=include_object,
+            render_as_batch=connection.dialect.name == "sqlite",
         )
 
         with context.begin_transaction():

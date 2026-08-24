@@ -1,6 +1,7 @@
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from typing import List, Optional
 
 from app.database import get_db
 from app.models import Rocket
@@ -15,17 +16,17 @@ async def get_rockets(
     limit: int = Query(100, le=1000),
     family: Optional[str] = None,
     is_active: Optional[bool] = None,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """Get list of rocket configurations."""
     query = db.query(Rocket)
-    
+
     if family:
         query = query.filter(Rocket.family == family)
-    
+
     if is_active is not None:
         query = query.filter(Rocket.is_active == is_active)
-    
+
     rockets = query.offset(skip).limit(limit).all()
     return rockets
 
@@ -36,5 +37,6 @@ async def get_rocket(rocket_id: int, db: Session = Depends(get_db)):
     rocket = db.query(Rocket).filter(Rocket.id == rocket_id).first()
     if not rocket:
         from fastapi import HTTPException
+
         raise HTTPException(status_code=404, detail="Rocket not found")
     return rocket

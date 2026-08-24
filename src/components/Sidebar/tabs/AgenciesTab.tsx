@@ -1,11 +1,16 @@
 // src/components/Sidebar/tabs/AgenciesTab.tsx
-import { useEffect, useMemo, useState } from "react";
-import type { KeyboardEvent, UIEvent } from "react";
+import { useMemo, useState } from "react";
+import type { KeyboardEvent } from "react";
 import { useLaunchStore } from "../../../store/launchStore";
 import { getCountryFlag } from "../../../lib/utils";
+import { usePaginatedList } from "../../../hooks/usePaginatedList";
+import { useEntityLaunchCounts } from "../../../hooks/useEntityLaunchCounts";
+import { useDebouncedCallback } from "../../../hooks/useDebouncedCallback";
+import { SearchField } from "../../common/SearchField";
 import "./Tab.css";
 
-const PAGE_SIZE = 200;
+const PAGE_SIZE = 150;
+const SEARCH_DEBOUNCE_MS = 200;
 
 export function AgenciesTab() {
   const agencies = useLaunchStore((state) => state.agencies);
@@ -19,28 +24,24 @@ export function AgenciesTab() {
   const [filterType, setFilterType] = useState<
     "all" | "government" | "commercial"
   >("all");
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [searchInput, setSearchInput] = useState(agencySearchQuery);
+  const debouncedSetAgencySearchQuery = useDebouncedCallback(
+    setAgencySearchQuery,
+    SEARCH_DEBOUNCE_MS,
+  );
 
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [agencySearchQuery, sortBy, filterType, agencies.length, launches.length]);
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+    debouncedSetAgencySearchQuery(value);
+  };
 
-  const agencyCounts = useMemo(() => {
-    const counts = new Map<number, number>();
-    for (const launch of launches) {
-      if (launch.agency_id == null) continue;
-      counts.set(launch.agency_id, (counts.get(launch.agency_id) || 0) + 1);
-    }
-    return counts;
-  }, [launches]);
+  const agencyCounts = useEntityLaunchCounts(launches, "agency_id");
 
   const sortedAgencies = useMemo(() => {
     let filtered = agencies.filter(
-        (agency) =>
-          agency.name.toLowerCase().includes(agencySearchQuery.toLowerCase()) ||
-          agency.abbrev
-            ?.toLowerCase()
-            .includes(agencySearchQuery.toLowerCase()),
+      (agency) =>
+        agency.name.toLowerCase().includes(agencySearchQuery.toLowerCase()) ||
+        agency.abbrev?.toLowerCase().includes(agencySearchQuery.toLowerCase()),
     );
 
     // Filter by type
@@ -71,18 +72,13 @@ export function AgenciesTab() {
     });
   }, [agencies, agencyCounts, agencySearchQuery, sortBy, filterType]);
 
-  const visibleAgencies = sortedAgencies.slice(0, visibleCount);
-  const canLoadMore = sortedAgencies.length > visibleCount;
-
-  const handleListScroll = (event: UIEvent<HTMLDivElement>) => {
-    if (!canLoadMore) return;
-    const target = event.currentTarget;
-    if (target.scrollHeight - target.scrollTop - target.clientHeight < 200) {
-      setVisibleCount((prev) =>
-        Math.min(prev + PAGE_SIZE, sortedAgencies.length),
-      );
-    }
-  };
+  const {
+    visibleItems: visibleAgencies,
+    visibleCount,
+    canLoadMore,
+    loadMore,
+    onScroll,
+  } = usePaginatedList(sortedAgencies, PAGE_SIZE);
 
   const handleAgencyKeyDown = (
     event: KeyboardEvent<HTMLDivElement>,
@@ -97,13 +93,10 @@ export function AgenciesTab() {
   return (
     <div className="agencies-tab">
       <div className="tab-header">
-        <input
-          type="text"
-          placeholder="Search agencies..."
-          value={agencySearchQuery}
-          onChange={(e) => setAgencySearchQuery(e.target.value)}
-          className="search-input"
-          aria-label="Search agencies"
+        <SearchField
+          value={searchInput}
+          onChange={handleSearchChange}
+          placeholder="Search agencies by name"
         />
 
         <div className="filter-chips">
@@ -130,25 +123,28 @@ export function AgenciesTab() {
           </button>
         </div>
 
-        <div className="sort-buttons">
-          <button
-            className={`sort-btn ${sortBy === "launches" ? "active" : ""}`}
-            type="button"
-            onClick={() => setSortBy("launches")}
-          >
-            By Launches
-          </button>
-          <button
-            className={`sort-btn ${sortBy === "name" ? "active" : ""}`}
-            type="button"
-            onClick={() => setSortBy("name")}
-          >
-            By Name
-          </button>
+        <div>
+          <span className="sort-label">Order</span>
+          <div className="sort-buttons">
+            <button
+              className={`sort-btn ${sortBy === "launches" ? "active" : ""}`}
+              type="button"
+              onClick={() => setSortBy("launches")}
+            >
+              By launches
+            </button>
+            <button
+              className={`sort-btn ${sortBy === "name" ? "active" : ""}`}
+              type="button"
+              onClick={() => setSortBy("name")}
+            >
+              By name
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="agencies-list" onScroll={handleListScroll}>
+      <div className="agencies-list" onScroll={onScroll}>
         <div className="list-count">
           {Math.min(visibleCount, sortedAgencies.length)} of{" "}
           {sortedAgencies.length} agencies
@@ -195,23 +191,17 @@ export function AgenciesTab() {
 
         {sortedAgencies.length === 0 && (
           <div className="empty-state">
-            <div className="empty-state-title">No agencies found</div>
+            <div className="empty-state-rule" />
+            <div className="empty-state-title">No agencies match that</div>
             <div className="empty-state-text">
-              Try a different search or filter.
+              The whole database is already on this machine — this is a filter
+              result, not a loading state.
             </div>
           </div>
         )}
 
         {canLoadMore && (
-          <button
-            className="load-more-btn"
-            type="button"
-            onClick={() =>
-              setVisibleCount((prev) =>
-                Math.min(prev + PAGE_SIZE, sortedAgencies.length),
-              )
-            }
-          >
+          <button className="load-more-btn" type="button" onClick={loadMore}>
             Load more
           </button>
         )}

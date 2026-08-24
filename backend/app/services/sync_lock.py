@@ -1,8 +1,10 @@
-from datetime import datetime, timezone, timedelta
-from typing import Optional
-from sqlalchemy.orm import Session
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
 from app.models import SyncState
+from app.utils.time import normalize_utc
 
 
 def acquire_sync_lock(db: Session, resource: str, owner: str, ttl_seconds: int = 60 * 60) -> bool:
@@ -19,9 +21,7 @@ def acquire_sync_lock(db: Session, resource: str, owner: str, ttl_seconds: int =
 
         # If locked and not expired, fail
         if row.is_locked:
-            locked_at = row.locked_at
-            if locked_at and locked_at.tzinfo is None:
-                locked_at = locked_at.replace(tzinfo=timezone.utc)
+            locked_at = normalize_utc(row.locked_at)
 
             if locked_at is None:
                 # Unknown lock age is treated as locked until recovered by stale-lock cleanup.

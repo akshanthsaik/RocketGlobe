@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, JSON, String, Text
+from sqlalchemy import JSON, Boolean, Column, DateTime, Integer, String, Text
 
 from .base import Base, TimestampMixin
 

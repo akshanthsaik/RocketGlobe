@@ -21,6 +21,9 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_column('sync_state', 'locked_at')
-    op.drop_column('sync_state', 'lock_owner')
-    op.drop_column('sync_state', 'is_locked')
+    # batch mode: needed for SQLite to drop columns (pre-3.35 SQLite has no native
+    # ALTER TABLE DROP COLUMN; Alembic falls back to a copy-and-move rebuild).
+    with op.batch_alter_table('sync_state') as batch_op:
+        batch_op.drop_column('locked_at')
+        batch_op.drop_column('lock_owner')
+        batch_op.drop_column('is_locked')

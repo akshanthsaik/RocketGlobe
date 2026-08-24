@@ -10,6 +10,7 @@ import {
 } from "../lib/api";
 
 let inFlightFetchAllData: Promise<void> | null = null;
+let playTimelineTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
 export type Launch = APILaunch;
 export type Pad = APIPad;
@@ -25,10 +26,53 @@ export type ViewType =
   | "agency-detail";
 export type LaunchTab = "upcoming" | "decided" | "previous";
 
-export interface View {
-  type: ViewType;
-  data?: any;
-}
+/**
+ * Lead time until a launch flies. Buckets are cumulative — "Next 30 days"
+ * includes the next 7 — which is how people read a horizon.
+ *
+ * A launch whose date has already slipped past but whose status still says it
+ * is coming lands in the nearest bucket rather than falling out of all of
+ * them: an overdue launch is imminent, not absent.
+ */
+export type ScheduleWindow = "7d" | "30d" | "90d" | "beyond" | "undated";
+
+export const SCHEDULE_WINDOWS: { value: ScheduleWindow; label: string }[] = [
+  { value: "7d", label: "Next 7 days" },
+  { value: "30d", label: "Next 30 days" },
+  { value: "90d", label: "Next 90 days" },
+  { value: "beyond", label: "Beyond 90 days" },
+  { value: "undated", label: "No date set" },
+];
+
+const DAY_MS = 1000 * 60 * 60 * 24;
+
+export const matchesScheduleWindow = (
+  launch: Launch,
+  window: ScheduleWindow,
+  now: number = Date.now(),
+): boolean => {
+  // Resolve "has no usable date" once, before narrowing on the window — a
+  // missing date and an unparseable one are the same thing to the reader, and
+  // both have to land in `undated` rather than falling out of every bucket.
+  const net = launch.net ? new Date(launch.net).getTime() : Number.NaN;
+  if (Number.isNaN(net)) return window === "undated";
+  if (window === "undated") return false;
+
+  if (window === "beyond") return net > now + 90 * DAY_MS;
+
+  const days = window === "7d" ? 7 : window === "30d" ? 30 : 90;
+  return net <= now + days * DAY_MS;
+};
+
+// Discriminated on `type` so narrowing view.type (e.g. `view.type ===
+// "rocket-detail"`) also narrows view.data's type, instead of it staying the
+// full Launch | Pad | Rocket | Agency union everywhere.
+export type View =
+  | { type: "launch-list" }
+  | { type: "launch-detail"; data?: Launch }
+  | { type: "pad-detail"; data?: Pad }
+  | { type: "rocket-detail"; data?: Rocket }
+  | { type: "agency-detail"; data?: Agency };
 
 interface LaunchStoreState {
   // Data
@@ -65,6 +109,8 @@ interface LaunchStoreState {
   agencyFilter: number | null;
   rocketFilter: number | null;
   countryFilter: string | null;
+  orbitFilter: string | null;
+  scheduleFilter: ScheduleWindow | null;
 
   // Loading
   isLoading: boolean;
@@ -109,6 +155,8 @@ interface LaunchStoreState {
   setAgencyFilter: (agencyId: number | null) => void;
   setRocketFilter: (rocketId: number | null) => void;
   setCountryFilter: (country: string | null) => void;
+  setOrbitFilter: (orbit: string | null) => void;
+  setScheduleFilter: (window: ScheduleWindow | null) => void;
   clearFilters: () => void;
 
   // Navigation actions
@@ -120,58 +168,96 @@ interface LaunchStoreState {
 // Helpers - Fixed to be more lenient and accurate
 export const isUpcomingLaunch = (launch: Launch): boolean => {
   if (!launch.net) return false;
+
+  // Decided takes precedence - a future "Go"/"Go for Launch" launch shows in
+  // the Decided tab only, not double-counted as Upcoming too.
+  if (launch.status && LAUNCH_STATUS.DECIDED.includes(launch.status)) {
+    return false;
+  }
+
   const launchDate = new Date(launch.net);
   const now = new Date();
-  
+
   // If launch date is in the future, it's upcoming
   if (launchDate > now) {
     // Check if status explicitly marks it as not upcoming
-    if (launch.status && LAUNCH_STATUS.PREVIOUS.includes(launch.status as any)) {
+    if (launch.status && LAUNCH_STATUS.PREVIOUS.includes(launch.status)) {
       return false;
     }
     return true;
   }
-  
+
   // If date is past but status says upcoming, trust the status
-  if (launch.status && LAUNCH_STATUS.UPCOMING.includes(launch.status as any)) {
+  if (launch.status && LAUNCH_STATUS.UPCOMING.includes(launch.status)) {
     return true;
   }
-  
+
   return false;
 };
 
 export const isDecidedLaunch = (launch: Launch): boolean => {
   if (!launch.status) return false;
-  return LAUNCH_STATUS.DECIDED.includes(launch.status as any);
+  return LAUNCH_STATUS.DECIDED.includes(launch.status);
 };
 
 export const isPreviousLaunch = (launch: Launch): boolean => {
   if (!launch.net) {
     // If no date but has a previous status, it's previous
-    if (launch.status && LAUNCH_STATUS.PREVIOUS.includes(launch.status as any)) {
+    if (launch.status && LAUNCH_STATUS.PREVIOUS.includes(launch.status)) {
       return true;
     }
     return false;
   }
-  
+
   const launchDate = new Date(launch.net);
   const now = new Date();
-  
+
   // If date is in the past, it's previous (unless status says otherwise)
   if (launchDate <= now) {
     // Unless status explicitly says it's upcoming
-    if (launch.status && LAUNCH_STATUS.UPCOMING.includes(launch.status as any)) {
+    if (launch.status && LAUNCH_STATUS.UPCOMING.includes(launch.status)) {
       return false;
     }
     return true;
   }
-  
+
   // If status says previous, trust it
-  if (launch.status && LAUNCH_STATUS.PREVIOUS.includes(launch.status as any)) {
+  if (launch.status && LAUNCH_STATUS.PREVIOUS.includes(launch.status)) {
     return true;
   }
-  
+
   return false;
+};
+
+/**
+ * Per-tab totals, computed in one pass. These are *unfiltered* counts — they
+ * describe the whole dataset, so the tab strip keeps telling you how much is
+ * in each bucket even while a filter narrows the visible list.
+ *
+ * Shared by the tab strip and the header so the two can never disagree.
+ */
+export interface LaunchTabCounts {
+  upcoming: number;
+  decided: number;
+  previous: number;
+}
+
+export const getLaunchTabCounts = (launches: Launch[]): LaunchTabCounts => {
+  let upcoming = 0;
+  let decided = 0;
+  let previous = 0;
+
+  // Independent tests, not a chain: the three predicates deliberately overlap
+  // (a past-dated "Go" launch is both Decided and Previous) and each tab lists
+  // its bucket independently. Counting with else-if would under-report a tab
+  // relative to the list it heads.
+  for (const launch of launches) {
+    if (isUpcomingLaunch(launch)) upcoming += 1;
+    if (isDecidedLaunch(launch)) decided += 1;
+    if (isPreviousLaunch(launch)) previous += 1;
+  }
+
+  return { upcoming, decided, previous };
 };
 
 export const getUpcomingLaunches = (launches: Launch[]): Launch[] =>
@@ -195,8 +281,30 @@ export const getPreviousLaunches = (launches: Launch[]): Launch[] =>
       (a, b) => new Date(b.net || 0).getTime() - new Date(a.net || 0).getTime(),
     );
 
+// Narrow parameter types (rather than the full 40+-field LaunchStoreState) so
+// callers that only have a handful of these fields - e.g. Globe.tsx's own
+// useMemo of individual store selectors - don't need to fake the rest via a
+// type-unsafe cast just to call these.
+interface FilterableLaunchState {
+  launches: Launch[];
+  pads: Pad[];
+  searchQuery: string;
+  statusFilter: string | null;
+  agencyFilter: number | null;
+  rocketFilter: number | null;
+  countryFilter: string | null;
+  orbitFilter: string | null;
+  scheduleFilter: ScheduleWindow | null;
+  timelineEnabled: boolean;
+  timelineDate: Date | null;
+}
+
+interface ActiveLaunchState extends FilterableLaunchState {
+  launchTab: LaunchTab;
+}
+
 // Filtered launches (used by getActiveLaunches)
-export const getFilteredLaunches = (state: LaunchStoreState): Launch[] => {
+export const getFilteredLaunches = (state: FilterableLaunchState): Launch[] => {
   let filtered = [...state.launches];
   if (state.searchQuery) {
     const query = state.searchQuery.toLowerCase();
@@ -219,6 +327,27 @@ export const getFilteredLaunches = (state: LaunchStoreState): Launch[] => {
     filtered = filtered.filter((l) => l.rocket_id === state.rocketFilter);
   }
 
+  if (state.orbitFilter) {
+    filtered = filtered.filter((l) => l.orbit === state.orbitFilter);
+  }
+
+  if (state.scheduleFilter) {
+    const window = state.scheduleFilter;
+    filtered = filtered.filter((l) => matchesScheduleWindow(l, window));
+  }
+
+  if (state.countryFilter) {
+    const padCountryById = new Map<number, string | null | undefined>();
+    for (const pad of state.pads) {
+      padCountryById.set(pad.id, pad.country_code);
+    }
+    filtered = filtered.filter(
+      (l) =>
+        l.pad_id != null &&
+        padCountryById.get(l.pad_id) === state.countryFilter,
+    );
+  }
+
   if (state.timelineEnabled && state.timelineDate) {
     filtered = filtered.filter(
       (l) => l.net && new Date(l.net) <= state.timelineDate!,
@@ -230,7 +359,7 @@ export const getFilteredLaunches = (state: LaunchStoreState): Launch[] => {
   );
 };
 
-export const getActiveLaunches = (state: LaunchStoreState): Launch[] => {
+export const getActiveLaunches = (state: ActiveLaunchState): Launch[] => {
   let launches: Launch[];
 
   if (state.launchTab === "upcoming") {
@@ -241,17 +370,13 @@ export const getActiveLaunches = (state: LaunchStoreState): Launch[] => {
     launches = getPreviousLaunches(state.launches);
   }
 
-  const tmpState: LaunchStoreState = { ...state, launches };
+  const tmpState: ActiveLaunchState = { ...state, launches };
   return getFilteredLaunches(tmpState);
 };
 
-export const getLaunchesForPad = (launches: Launch[], padId: number) =>
-  launches
-    .filter((l) => l.pad_id === padId)
-    .sort(
-      (a, b) => new Date(b.net || 0).getTime() - new Date(a.net || 0).getTime(),
-    );
-
+// Pads use `useEntityLaunches` instead; these two remain because Globe.tsx
+// needs the raw lists to decide which pads a selected rocket or agency flies
+// from, outside of React's render cycle.
 export const getLaunchesForRocket = (launches: Launch[], rocketId: number) =>
   launches
     .filter((l) => l.rocket_id === rocketId)
@@ -266,13 +391,57 @@ export const getLaunchesForAgency = (launches: Launch[], agencyId: number) =>
       (a, b) => new Date(b.net || 0).getTime() - new Date(a.net || 0).getTime(),
     );
 
+/** Root view for a mode. Internal to the store — switching modes resets the
+ *  sidebar stack to this, and nothing outside needs to ask. */
+const firstViewForMode = (globeMode: GlobeMode): ViewType => {
+  if (globeMode === "pads") return "pad-detail";
+  if (globeMode === "rockets") return "rocket-detail";
+  if (globeMode === "agencies") return "agency-detail";
+  return "launch-list";
+};
+
+export interface YearBucket {
+  year: number;
+  count: number;
+}
+
+/**
+ * Launches per calendar year, with empty years filled in.
+ *
+ * The gaps matter: an axis that skips quiet years would compress the 1960s
+ * into the same width as the 2020s and hide the shape of the thing — the
+ * space race, the post-Shuttle lull, the current commercial climb.
+ */
+export const getLaunchYearHistogram = (launches: Launch[]): YearBucket[] => {
+  const counts = new Map<number, number>();
+
+  for (const launch of launches) {
+    if (!launch.net) continue;
+    const year = new Date(launch.net).getFullYear();
+    if (!Number.isFinite(year)) continue;
+    counts.set(year, (counts.get(year) ?? 0) + 1);
+  }
+
+  if (counts.size === 0) return [];
+
+  const years = [...counts.keys()];
+  const first = Math.min(...years);
+  const last = Math.max(...years);
+
+  const buckets: YearBucket[] = [];
+  for (let year = first; year <= last; year += 1) {
+    buckets.push({ year, count: counts.get(year) ?? 0 });
+  }
+  return buckets;
+};
+
 export const getTimelineLaunches = (launches: Launch[]): Launch[] =>
   launches
     .filter((l) => l.net)
     .sort((a, b) => new Date(a.net!).getTime() - new Date(b.net!).getTime());
 
 export const getTimelineLaunchesForGlobe = (
-  state: LaunchStoreState,
+  state: ActiveLaunchState,
 ): Launch[] => {
   let launches = getActiveLaunches(state);
 
@@ -316,6 +485,8 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
   agencyFilter: null,
   rocketFilter: null,
   countryFilter: null,
+  orbitFilter: null,
+  scheduleFilter: null,
 
   isLoading: false,
   error: null,
@@ -420,31 +591,37 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
       // Pop the current view
       const newStack = stack.slice(0, -1);
       const previousView = newStack[newStack.length - 1];
-      
+
       // Clear selections if going back to list view
-      if (previousView.type === "launch-list" || 
-          (previousView.type === "pad-detail" && state.globeMode === "pads" && !state.selectedPad) ||
-          (previousView.type === "rocket-detail" && state.globeMode === "rockets" && !state.selectedRocket) ||
-          (previousView.type === "agency-detail" && state.globeMode === "agencies" && !state.selectedAgency)) {
-        set({ 
+      if (
+        previousView.type === "launch-list" ||
+        (previousView.type === "pad-detail" &&
+          state.globeMode === "pads" &&
+          !state.selectedPad) ||
+        (previousView.type === "rocket-detail" &&
+          state.globeMode === "rockets" &&
+          !state.selectedRocket) ||
+        (previousView.type === "agency-detail" &&
+          state.globeMode === "agencies" &&
+          !state.selectedAgency)
+      ) {
+        set({
           sidebarViewStack: newStack,
           selectedLaunch: null,
-          selectedPad: previousView.type === "pad-detail" ? state.selectedPad : null,
-          selectedRocket: previousView.type === "rocket-detail" ? state.selectedRocket : null,
-          selectedAgency: previousView.type === "agency-detail" ? state.selectedAgency : null,
+          selectedPad:
+            previousView.type === "pad-detail" ? state.selectedPad : null,
+          selectedRocket:
+            previousView.type === "rocket-detail" ? state.selectedRocket : null,
+          selectedAgency:
+            previousView.type === "agency-detail" ? state.selectedAgency : null,
         });
       } else {
         set({ sidebarViewStack: newStack });
       }
     } else {
       // Reset to default view for current mode
-      let firstView: ViewType = "launch-list";
-      if (state.globeMode === "pads") firstView = "pad-detail";
-      else if (state.globeMode === "rockets") firstView = "rocket-detail";
-      else if (state.globeMode === "agencies") firstView = "agency-detail";
-
-      set({ 
-        sidebarViewStack: [{ type: firstView }],
+      set({
+        sidebarViewStack: [{ type: firstViewForMode(state.globeMode) }],
         selectedLaunch: null,
         selectedPad: null,
         selectedAgency: null,
@@ -453,18 +630,11 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
     }
   },
 
-
-
   resetSidebarView: () => {
     const globeMode = get().globeMode;
-    let firstView: ViewType = "launch-list";
-
-    if (globeMode === "pads") firstView = "pad-detail";
-    else if (globeMode === "rockets") firstView = "rocket-detail";
-    else if (globeMode === "agencies") firstView = "agency-detail";
 
     set({
-      sidebarViewStack: [{ type: firstView }],
+      sidebarViewStack: [{ type: firstViewForMode(globeMode) }],
       selectedLaunch: null,
       selectedPad: null,
       selectedAgency: null,
@@ -477,7 +647,10 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
   setLaunchTab: (tab) => set({ launchTab: tab }),
 
   selectLaunch: (launch) => {
-    set({ selectedLaunch: launch, sidebarOpen: launch ? true : get().sidebarOpen });
+    set({
+      selectedLaunch: launch,
+      sidebarOpen: launch ? true : get().sidebarOpen,
+    });
     if (launch) {
       get().pushSidebarView({ type: "launch-detail", data: launch });
     }
@@ -492,7 +665,10 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
   },
 
   selectAgency: (agency) => {
-    set({ selectedAgency: agency, sidebarOpen: agency ? true : get().sidebarOpen });
+    set({
+      selectedAgency: agency,
+      sidebarOpen: agency ? true : get().sidebarOpen,
+    });
     if (agency) {
       get().setGlobeMode("agencies");
       get().pushSidebarView({ type: "agency-detail", data: agency });
@@ -500,7 +676,10 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
   },
 
   selectRocket: (rocket) => {
-    set({ selectedRocket: rocket, sidebarOpen: rocket ? true : get().sidebarOpen });
+    set({
+      selectedRocket: rocket,
+      sidebarOpen: rocket ? true : get().sidebarOpen,
+    });
     if (rocket) {
       get().setGlobeMode("rockets");
       get().pushSidebarView({ type: "rocket-detail", data: rocket });
@@ -515,50 +694,60 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
       set({ timelineDate: state.timelineRange[0] });
     }
     set({ isTimelinePlaying: true });
-    
+
     // Start step-based auto-play
     const playNext = () => {
       const currentState = get();
       if (!currentState.isTimelinePlaying) return;
-      
+
       const launches = getTimelineLaunches(currentState.launches);
       if (launches.length === 0) {
         set({ isTimelinePlaying: false });
         return;
       }
-      
+
       const currentDate = currentState.timelineDate;
       if (!currentDate) {
         set({ isTimelinePlaying: false });
         return;
       }
-      
+
       // Find next launch after current date
       const nextLaunch = launches.find(
-        (l) => l.net && new Date(l.net) > currentDate
+        (l) => l.net && new Date(l.net) > currentDate,
       );
-      
+
       if (nextLaunch?.net) {
-        set({ 
+        set({
           timelineDate: new Date(nextLaunch.net),
           selectedLaunch: nextLaunch, // Auto-select during playback
         });
         // Schedule next step based on speed (slower = more delay)
         const delay = 4000 / currentState.timelineSpeed; // 4 seconds at 1x, slower overall
-        setTimeout(playNext, delay);
+        playTimelineTimeoutId = setTimeout(playNext, delay);
       } else {
         // Reached end
         set({ isTimelinePlaying: false });
       }
     };
-    
+
     // Start playing after a short delay
-    setTimeout(playNext, 500);
+    playTimelineTimeoutId = setTimeout(playNext, 500);
   },
 
-  pauseTimeline: () => set({ isTimelinePlaying: false }),
+  pauseTimeline: () => {
+    if (playTimelineTimeoutId !== null) {
+      clearTimeout(playTimelineTimeoutId);
+      playTimelineTimeoutId = null;
+    }
+    set({ isTimelinePlaying: false });
+  },
 
   resetTimeline: () => {
+    if (playTimelineTimeoutId !== null) {
+      clearTimeout(playTimelineTimeoutId);
+      playTimelineTimeoutId = null;
+    }
     const range = get().timelineRange;
     set({
       timelineDate: range ? range[0] : null,
@@ -610,6 +799,8 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
   setAgencyFilter: (agencyId) => set({ agencyFilter: agencyId }),
   setRocketFilter: (rocketId) => set({ rocketFilter: rocketId }),
   setCountryFilter: (country) => set({ countryFilter: country }),
+  setOrbitFilter: (orbit) => set({ orbitFilter: orbit }),
+  setScheduleFilter: (window) => set({ scheduleFilter: window }),
 
   clearFilters: () =>
     set({
@@ -621,6 +812,8 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
       agencyFilter: null,
       rocketFilter: null,
       countryFilter: null,
+      orbitFilter: null,
+      scheduleFilter: null,
       timelineDate: null,
     }),
 

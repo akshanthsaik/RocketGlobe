@@ -1,12 +1,15 @@
-from pydantic import BaseModel
-from typing import Optional
 from datetime import datetime
+from typing import Optional
+
+from pydantic import BaseModel
+
 
 class LaunchBase(BaseModel):
     name: str
     status: Optional[str] = None
     net: Optional[datetime] = None
     image_url: Optional[str] = None
+
 
 class LaunchResponse(LaunchBase):
     id: int
@@ -22,6 +25,6 @@ class LaunchResponse(LaunchBase):
     orbit: Optional[str] = None
     webcast_live: Optional[bool] = None
     video_url: Optional[str] = None
-    
+
     class Config:
         from_attributes = True

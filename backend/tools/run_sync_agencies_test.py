@@ -1,14 +1,15 @@
 import asyncio
-from datetime import datetime, timezone, timedelta
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+import pathlib
 
 # Ensure 'backend' package root is on sys.path when running the script directly
 import sys
-import pathlib
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
-from app.models.base import Base
 from app.models.agency import Agency
 from app.models.sync_state import SyncState
 from app.workers.sync_worker import sync_agencies
@@ -29,8 +30,7 @@ class MockClient:
 
 
 def run_test():
-    engine = create_engine('sqlite:///:memory:', connect_args={"check_same_thread": False})
-    # Create only the tables required for this test to avoid PostGIS-specific types (Geography)
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     Agency.__table__.create(bind=engine, checkfirst=True)
     SyncState.__table__.create(bind=engine, checkfirst=True)
     Session = sessionmaker(bind=engine)
@@ -79,5 +79,5 @@ def run_test():
     print("run_sync_agencies_test: PASS")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run_test()

@@ -1,12 +1,14 @@
-from contextlib import asynccontextmanager
-import asyncio
-from datetime import datetime, timezone
 import logging
-import threading
+import os
+import subprocess
+import sys
+from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 from uuid import uuid4
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
@@ -19,10 +21,12 @@ from app.services.sync_run import (
     fail_sync_run,
     get_active_sync_run,
     get_latest_sync_run,
+    get_launch_rate_limit_cooldown_seconds,
     get_sync_run,
     recover_stale_sync_state,
     serialize_sync_run,
 )
+from app.utils.time import normalize_utc
 
 logging.basicConfig(
     level=logging.INFO,
@@ -30,26 +34,23 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 SYNC_LOCK_TTL_SECONDS = 60 * 60
-
-
-def _normalize_utc(value: Optional[datetime]) -> Optional[datetime]:
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value
+LOOPBACK_HOSTS = {"127.0.0.1", "::1", "localhost"}
 
 
 def _all_static_resources_recently_synced(db: Session) -> bool:
     from app.models import SyncState
 
+    static_resources = ("agencies", "pads", "rockets")
+    rows = db.query(SyncState).filter(SyncState.resource.in_(static_resources)).all()
+    by_resource = {row.resource: row for row in rows}
+
     now = datetime.now(timezone.utc)
-    for resource in ("agencies", "pads", "rockets"):
-        row = db.query(SyncState).filter(SyncState.resource == resource).first()
+    for resource in static_resources:
+        row = by_resource.get(resource)
         if not row or not row.last_synced_at:
             return False
 
-        last_sync = _normalize_utc(row.last_synced_at)
+        last_sync = normalize_utc(row.last_synced_at)
         if not last_sync:
             return False
 
@@ -60,38 +61,26 @@ def _all_static_resources_recently_synced(db: Session) -> bool:
     return True
 
 
-def _launch_rate_limit_cooldown_seconds(db: Session) -> Optional[int]:
-    from app.models import SyncRun
+def _raise_admin_error(message: str, status_code: int = 500) -> None:
+    raise HTTPException(status_code=status_code, detail=message)
 
-    now = datetime.now(timezone.utc)
-    recent_runs = db.query(SyncRun).order_by(SyncRun.started_at.desc()).limit(10).all()
 
-    for run in recent_runs:
-        stats = run.stats if isinstance(run.stats, dict) else {}
-        rate_limited = stats.get("_rate_limited")
-        if not isinstance(rate_limited, dict):
-            continue
+def _require_admin_access(
+    request: Request,
+    x_admin_token: Optional[str] = Header(default=None, alias="X-Admin-Token"),
+) -> None:
+    client_host = request.client.host if request.client else None
+    allowed_hosts = set(LOOPBACK_HOSTS)
+    if os.environ.get("PYTEST_VERSION"):
+        allowed_hosts.add("testclient")
+    if client_host not in allowed_hosts:
+        logger.warning("Blocked non-loopback admin request from host=%s", client_host)
+        raise HTTPException(status_code=403, detail="Admin endpoint is local-only")
 
-        raw_wait = rate_limited.get("launches")
-        try:
-            wait_seconds = int(float(raw_wait))
-        except (TypeError, ValueError):
-            continue
-
-        if wait_seconds <= 0:
-            continue
-
-        wait_seconds = min(wait_seconds, settings.LL2_LAUNCHES_MAX_WAIT_SECONDS)
-        baseline = _normalize_utc(run.finished_at or run.updated_at or run.started_at)
-        if not baseline:
-            continue
-
-        elapsed = (now - baseline).total_seconds()
-        remaining = int(round(wait_seconds - elapsed))
-        if remaining > 0:
-            return remaining
-
-    return None
+    expected_token = settings.ADMIN_TOKEN.strip()
+    if expected_token and x_admin_token != expected_token:
+        logger.warning("Rejected admin request with invalid token from host=%s", client_host)
+        raise HTTPException(status_code=401, detail="Invalid admin token")
 
 
 @asynccontextmanager
@@ -194,8 +183,49 @@ async def health(db: Session = Depends(get_db)):
         raise HTTPException(status_code=503, detail="Database connection failed")
 
 
+def _spawn_sync_subprocess(run_id: str) -> None:
+    """Run LL2 sync in a separate process so it cannot destabilize uvicorn's event loop (esp. Windows)."""
+    backend_dir = Path(__file__).resolve().parents[1]
+    cmd = [sys.executable, "-m", "app.workers.run_sync_once", run_id]
+    popen_kwargs: dict = {
+        "args": cmd,
+        "cwd": str(backend_dir),
+        "env": os.environ.copy(),
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+    }
+    if settings.SYNC_SUBPROCESS_INHERIT_STDERR:
+        # stderr inherits from uvicorn → sync_worker logs show in the same terminal
+        popen_kwargs["stderr"] = None
+    else:
+        popen_kwargs["stderr"] = subprocess.DEVNULL
+    if sys.platform == "win32":
+        # New process group isolates Ctrl+C; CREATE_NO_WINDOW avoids a blank console flashing
+        # (DETACHED_PROCESS would allocate a visible console for python.exe).
+        creationflags = subprocess.CREATE_NEW_PROCESS_GROUP
+        if hasattr(subprocess, "CREATE_NO_WINDOW"):
+            creationflags |= subprocess.CREATE_NO_WINDOW
+        popen_kwargs["creationflags"] = creationflags
+    else:
+        popen_kwargs["start_new_session"] = True
+        popen_kwargs["close_fds"] = True
+
+    try:
+        subprocess.Popen(**popen_kwargs)
+    except OSError as exc:
+        logger.error("Failed to spawn sync subprocess (run_id=%s): %s", run_id, exc)
+        db = SessionLocal()
+        try:
+            fail_sync_run(db, run_id, f"spawn_failed:{type(exc).__name__}:{exc}")
+        finally:
+            db.close()
+        raise HTTPException(status_code=500, detail="Failed to start sync worker") from exc
+
+    logger.info("Background sync subprocess spawned (run_id=%s)", run_id)
+
+
 @app.post("/admin/sync", tags=["admin"], status_code=202)
-async def trigger_sync():
+async def trigger_sync(_: None = Depends(_require_admin_access)):
     """
     Manually trigger full data sync from Launch Library 2 API.
 
@@ -203,19 +233,6 @@ async def trigger_sync():
     The actual sync uses the DB-level lock to prevent concurrent runs.
     """
     from app.models import SyncState
-    from app.workers.sync_worker import sync_all
-
-    def _run_sync(run_id: str):
-        db = SessionLocal()
-        try:
-            logger.info("Background sync started (run_id=%s)", run_id)
-            result = asyncio.run(sync_all(db, run_id=run_id))
-            logger.info("Background sync completed (run_id=%s): %s", run_id, result)
-        except Exception as e:
-            logger.error("Background sync failed (run_id=%s): %s", run_id, e)
-            fail_sync_run(db, run_id, f"{type(e).__name__}: {e}")
-        finally:
-            db.close()
 
     db_check = SessionLocal()
     try:
@@ -232,11 +249,7 @@ async def trigger_sync():
                 },
             )
 
-        lock_row = (
-            db_check.query(SyncState)
-            .filter(SyncState.resource == "sync_all")
-            .first()
-        )
+        lock_row = db_check.query(SyncState).filter(SyncState.resource == "sync_all").first()
         if lock_row and lock_row.is_locked:
             latest_run = get_latest_sync_run(db_check)
             return JSONResponse(
@@ -248,16 +261,13 @@ async def trigger_sync():
                 },
             )
 
-        launch_cooldown = _launch_rate_limit_cooldown_seconds(db_check)
+        launch_cooldown = get_launch_rate_limit_cooldown_seconds(db_check)
         if launch_cooldown and _all_static_resources_recently_synced(db_check):
             return JSONResponse(
                 status_code=429,
                 content={
                     "status": "rate_limited",
-                    "message": (
-                        "LL2 launch sync is rate-limited. "
-                        f"Try again in about {launch_cooldown} seconds."
-                    ),
+                    "message": (f"LL2 launch sync is rate-limited. Try again in about {launch_cooldown} seconds."),
                     "resource": "launches",
                     "retry_after_seconds": launch_cooldown,
                 },
@@ -270,14 +280,7 @@ async def trigger_sync():
     finally:
         db_check.close()
 
-    # Run sync in a daemon worker thread so backend shutdown is not blocked by a long sync.
-    thread = threading.Thread(
-        target=_run_sync,
-        args=(run_id,),
-        name=f"sync-worker-{run_id[:8]}",
-        daemon=True,
-    )
-    thread.start()
+    _spawn_sync_subprocess(run_id)
     return JSONResponse(
         status_code=202,
         content={
@@ -295,6 +298,7 @@ async def get_sync_status(
         default=False,
         description="If true, skips expensive data count queries for fast polling",
     ),
+    _: None = Depends(_require_admin_access),
     db: Session = Depends(get_db),
 ):
     from app.models import Agency, Launch, Pad, Rocket, SyncState
@@ -326,9 +330,7 @@ async def get_sync_status(
         if run is None:
             run = get_active_sync_run(db) or get_latest_sync_run(db)
 
-        is_sync_running = bool(
-            run and run.is_active and run.status in {"queued", "running"}
-        )
+        is_sync_running = bool(run and run.is_active and run.status in {"queued", "running"})
 
         rate_limited_resources = {}
         retry_after_seconds = None
@@ -356,11 +358,7 @@ async def get_sync_status(
             "sync_lock": {
                 "is_locked": sync_state.is_locked if sync_state else False,
                 "lock_owner": sync_state.lock_owner if sync_state else None,
-                "locked_at": (
-                    sync_state.locked_at.isoformat()
-                    if (sync_state and sync_state.locked_at)
-                    else None
-                ),
+                "locked_at": (sync_state.locked_at.isoformat() if (sync_state and sync_state.locked_at) else None),
             },
             "data_counts": data_counts,
             "last_updated": last_updated,
@@ -369,11 +367,11 @@ async def get_sync_status(
         }
     except Exception as e:
         logger.error("Failed to get sync status: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_admin_error("Failed to fetch sync status")
 
 
 @app.get("/admin/api-throttle", tags=["admin"])
-async def check_api_throttle():
+async def check_api_throttle(_: None = Depends(_require_admin_access)):
     from app.services.ll2_client import LL2Client
 
     client = LL2Client()
@@ -382,13 +380,13 @@ async def check_api_throttle():
         return {"status": "success", "throttle_info": response.json()}
     except Exception as e:
         logger.error("Failed to check throttle: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_admin_error("Failed to fetch API throttle info")
     finally:
         await client.close()
 
 
 @app.get("/admin/test-api", tags=["admin"])
-async def test_api():
+async def test_api(_: None = Depends(_require_admin_access)):
     from app.services.ll2_client import LL2Client
 
     client = LL2Client()
@@ -409,13 +407,13 @@ async def test_api():
         }
     except Exception as e:
         logger.error("API test failed: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_admin_error("Failed to test upstream API")
     finally:
         await client.close()
 
 
 @app.get("/admin/check-api", tags=["admin"])
-async def check_api():
+async def check_api(_: None = Depends(_require_admin_access)):
     from app.services.ll2_client import LL2Client
 
     client = LL2Client()
@@ -430,13 +428,17 @@ async def check_api():
         }
     except Exception as e:
         logger.error("API check failed: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_admin_error("Failed to check upstream API")
     finally:
         await client.close()
 
 
 @app.delete("/admin/clear-data", tags=["admin"])
-async def clear_all_data(confirm: bool = False, db: Session = Depends(get_db)):
+async def clear_all_data(
+    confirm: bool = False,
+    _: None = Depends(_require_admin_access),
+    db: Session = Depends(get_db),
+):
     if not confirm:
         raise HTTPException(status_code=400, detail="Must provide confirm=true to clear data")
 
@@ -472,7 +474,7 @@ async def clear_all_data(confirm: bool = False, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         logger.error("Failed to clear data: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        _raise_admin_error("Failed to clear data")
 
 
 app.include_router(api_router, prefix="/api")

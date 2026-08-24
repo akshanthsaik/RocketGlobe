@@ -1,9 +1,10 @@
 // src/components/Sidebar/views/AgencyDetailView.tsx
-import { useMemo } from "react";
 import { useLaunchStore } from "../../../store/launchStore";
 import { Agency } from "../../../lib/api";
 import { getCountryFlag } from "../../../lib/utils";
-import { LaunchCard } from "../cards/LaunchCard";
+import { useEntityLaunches } from "../../../hooks/useEntityLaunches";
+import { LaunchSection } from "./LaunchSection";
+import { BackButton } from "../../common/BackButton";
 import "./View.css";
 
 interface AgencyDetailViewProps {
@@ -12,163 +13,105 @@ interface AgencyDetailViewProps {
 
 export function AgencyDetailView({ agency }: AgencyDetailViewProps) {
   const popSidebarView = useLaunchStore((state) => state.popSidebarView);
-  const selectLaunch = useLaunchStore((state) => state.selectLaunch);
   const rockets = useLaunchStore((state) => state.rockets);
   const allLaunches = useLaunchStore((state) => state.launches);
 
-  // Use useMemo to prevent infinite loop
-  const launches = useMemo(() => {
-    return allLaunches
-      .filter((l) => l.agency_id === agency.id)
-      .sort(
-        (a, b) =>
-          new Date(b.net || 0).getTime() - new Date(a.net || 0).getTime(),
-      );
-  }, [allLaunches, agency.id]);
+  const { launches, upcomingLaunches, pastLaunches } = useEntityLaunches(
+    allLaunches,
+    agency.id,
+    "agency_id",
+  );
 
   const agencyRockets = rockets.filter((r) => r.manufacturer_id === agency.id);
-  const agencyPads = [...new Set(launches.map((l) => l.pad_id))].filter(
-    Boolean,
-  );
+  const padCount = new Set(
+    launches.map((l) => l.pad_id).filter((id): id is number => id != null),
+  ).size;
 
-  const now = new Date();
-  const upcomingLaunches = useMemo(
-    () => launches.filter((l) => l.net && new Date(l.net) > now),
-    [launches],
-  );
-
-  const pastLaunches = useMemo(
-    () => launches.filter((l) => l.net && new Date(l.net) <= now),
-    [launches],
-  );
+  const facts = [
+    agency.type ? { k: "Type", v: agency.type } : null,
+    agency.country_code
+      ? {
+          k: "Country",
+          v: `${getCountryFlag(agency.country_code)}  ${agency.country_code}`,
+        }
+      : null,
+    agency.founding_year
+      ? { k: "Founded", v: String(agency.founding_year) }
+      : null,
+    agency.administrator
+      ? { k: "Administrator", v: agency.administrator }
+      : null,
+    { k: "Status", v: agency.is_active ? "Active" : "Inactive" },
+  ].filter((fact): fact is { k: string; v: string } => fact !== null);
 
   return (
-    <div className="agency-detail-view">
+    <div className="agency-detail-view detail-view">
       <div className="view-header">
-        <button type="button" className="back-btn" onClick={popSidebarView}>
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-          >
-            <path d="M19 12H5M12 19l-7-7 7-7" />
-          </svg>
-        </button>
+        <BackButton onClick={popSidebarView} />
         <h2 className="view-title">Agency</h2>
       </div>
 
       <div className="view-body">
-        {/* Agency Header */}
-        <div className="agency-header">
-          {agency.logo_url && (
-            <div className="agency-logo-large">
-              <img src={agency.logo_url} alt={agency.name} />
-            </div>
-          )}
-          <h3 className="agency-name">{agency.name}</h3>
-          {agency.abbrev && (
-            <div className="agency-abbrev">{agency.abbrev}</div>
-          )}
-        </div>
-
-        {/* Agency Info */}
-        <div className="detail-section">
-          <div className="detail-label">Information</div>
-          {agency.type && (
-            <div className="detail-row">
-              <span className="detail-key">Type:</span>
-              <span className="detail-value">{agency.type}</span>
-            </div>
-          )}
-          {agency.country_code && (
-            <div className="detail-row">
-              <span className="detail-key">Country:</span>
-              <span className="detail-value">
-                {getCountryFlag(agency.country_code)}
+        <div className="agency-identity">
+          <div className="agency-crest">
+            {agency.logo_url ? (
+              <img src={agency.logo_url} alt="" />
+            ) : (
+              <span className="agency-crest-mono">
+                {(agency.abbrev || agency.name).slice(0, 2).toUpperCase()}
               </span>
-            </div>
-          )}
-          {agency.founding_year && (
-            <div className="detail-row">
-              <span className="detail-key">Founded:</span>
-              <span className="detail-value">{agency.founding_year}</span>
-            </div>
-          )}
-          {agency.administrator && (
-            <div className="detail-row">
-              <span className="detail-key">Administrator:</span>
-              <span className="detail-value">{agency.administrator}</span>
-            </div>
-          )}
-          <div className="detail-row">
-            <span className="detail-key">Status:</span>
-            <span className="detail-value">
-              {agency.is_active ? "Active" : "Inactive"}
-            </span>
+            )}
+          </div>
+          <div className="agency-identity-text">
+            <h3 className="view-name">{agency.name}</h3>
+            {agency.abbrev && <p className="view-sub">{agency.abbrev}</p>}
           </div>
         </div>
 
-        {/* Description */}
+        <section className="view-block">
+          <div className="view-kicker">Record</div>
+          <div className="fact-grid">
+            {facts.map((fact) => (
+              <div key={fact.k} className="fact">
+                <div className="fact-key">{fact.k}</div>
+                <div className="fact-value">{fact.v}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {agency.description && (
-          <div className="detail-section">
-            <div className="detail-label">About</div>
-            <p className="agency-description">{agency.description}</p>
-          </div>
+          <section className="view-block">
+            <div className="view-kicker">About</div>
+            <p className="view-prose">{agency.description}</p>
+          </section>
         )}
 
-        {/* Stats */}
-        <div className="stats-grid">
-          <div className="stat-box">
-            <div className="stat-value">{launches.length}</div>
-            <div className="stat-label">Launches</div>
+        <div className="view-stats">
+          <div className="view-stat">
+            <div className="view-stat-value">{launches.length}</div>
+            <div className="view-stat-label">Launches</div>
           </div>
-          <div className="stat-box">
-            <div className="stat-value">{agencyRockets.length}</div>
-            <div className="stat-label">Rockets</div>
+          <div className="view-stat">
+            <div className="view-stat-value">{agencyRockets.length}</div>
+            <div className="view-stat-label">Rockets</div>
           </div>
-          <div className="stat-box">
-            <div className="stat-value">{agencyPads.length}</div>
-            <div className="stat-label">Pads</div>
+          <div className="view-stat">
+            <div className="view-stat-value">{padCount}</div>
+            <div className="view-stat-label">Pads used</div>
           </div>
         </div>
 
-        {/* Upcoming Launches */}
-        {upcomingLaunches.length > 0 && (
-          <div className="section">
-            <div className="section-header">
-              <h3 className="section-title">Upcoming Launches</h3>
-              <span className="section-count">{upcomingLaunches.length}</span>
-            </div>
-            <div className="launch-list">
-              {upcomingLaunches.slice(0, 10).map((launch) => (
-                <LaunchCard
-                  key={launch.id}
-                  launch={launch}
-                  onClick={() => selectLaunch(launch)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
+        <LaunchSection title="Upcoming launches" launches={upcomingLaunches} />
+        <LaunchSection title="Past launches" launches={pastLaunches} />
 
-        {/* Past Launches */}
-        {pastLaunches.length > 0 && (
-          <div className="section">
-            <div className="section-header">
-              <h3 className="section-title">Past Launches</h3>
-              <span className="section-count">{pastLaunches.length}</span>
-            </div>
-            <div className="launch-list">
-              {pastLaunches.slice(0, 10).map((launch) => (
-                <LaunchCard
-                  key={launch.id}
-                  launch={launch}
-                  onClick={() => selectLaunch(launch)}
-                />
-              ))}
+        {launches.length === 0 && (
+          <div className="view-empty">
+            <div className="view-empty-rule" />
+            <div className="view-empty-title">No launches on record</div>
+            <div className="view-empty-text">
+              This agency is in the database but no launch in the local copy is
+              credited to it.
             </div>
           </div>
         )}

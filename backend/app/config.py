@@ -1,7 +1,8 @@
 from pydantic_settings import BaseSettings
 
+
 class Settings(BaseSettings):
-    DATABASE_URL: str
+    DATABASE_URL: str = "sqlite:///./rocketglobe.db"
     LL2_BASE_URL: str = "https://ll.thespacedevs.com/2.3.0"
     LL2_SYNC_INTERVAL: int = 900
     LL2_SYNC_PAGE_LIMIT: int = 500
@@ -21,8 +22,11 @@ class Settings(BaseSettings):
     SQL_ECHO: bool = False
     API_HOST: str = "localhost"
     API_PORT: int = 8000
-    
+    ADMIN_TOKEN: str = ""
+    SYNC_SUBPROCESS_INHERIT_STDERR: bool = False
+
     class Config:
         env_file = ".env"
+
 
 settings = Settings()

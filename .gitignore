@@ -62,3 +62,10 @@ public/cesium/
 .temp/
 
 /src-tauri/resources/
+# SQLite runtime artifacts (regenerable, not the seed snapshot)
+*.db-shm
+*.db-wal
+*.db.bak-*
+
+# Keep the seed snapshot (needed to run offline; exempt from *.db above)
+!backend/seed_data/rocketglobe_seed.db

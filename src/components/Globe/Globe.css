@@ -1,21 +1,23 @@
-/* =========================
-   GLOBE CONTAINER
-   ========================= */
-
+/* =========================================================
+   GLOBE PANE
+   The globe sits a step darker than the chrome so the canvas
+   reads as a well the app looks into, rather than another
+   panel beside the sidebar.
+   ========================================================= */
 .globe-container {
   position: relative;
   width: 100%;
   height: 100%;
   z-index: var(--z-globe);
-  background: var(--bg-space);
+  background: var(--color-bg-well);
   overflow: hidden;
-  transition: background-color var(--transition-base);
 }
 
-/* =========================
-   CESIUM VIEWER
-   ========================= */
-
+/* =========================================================
+   CESIUM CANVAS
+   Cesium sizes its own container; these force it to fill the
+   pane instead, which is what lets the sidebar resize freely.
+   ========================================================= */
 .globe-container .cesium-viewer {
   position: absolute;
   inset: 0;
@@ -27,145 +29,74 @@
   width: 100% !important;
   height: 100% !important;
   cursor: grab;
+  /* Promote the canvas to its own layer — it repaints constantly during a
+     camera flight and should not drag the panels around it into the repaint. */
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 .globe-container .cesium-viewer canvas:active {
   cursor: grabbing;
 }
 
-/* =========================
-   OVERLAY LAYER
-   ========================= */
-
-.globe-overlays {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: var(--z-legend);
-}
-
-/* =========================
-   HIDE CESIUM CREDITS
-   ========================= */
-
+/* Cesium's credit bar. The data it credits (Natural Earth, public domain)
+   carries no attribution requirement now that no imagery is loaded. */
 .globe-container .cesium-viewer-bottom,
 .globe-container .cesium-credit-logoContainer,
 .globe-container .cesium-credit-textContainer {
   display: none !important;
 }
 
-/* =========================
-   CESIUM UI OVERRIDES
-   ========================= */
-
-.globe-container .cesium-button {
-  background: rgba(16, 20, 27, 0.9) !important;
-  border: 1px solid rgba(229, 234, 242, 0.12) !important;
-  color: rgba(195, 203, 214, 0.82) !important;
-  border-radius: 8px !important;
-  transition:
-    background-color 0.2s ease,
-    border-color 0.2s ease,
-    color 0.2s ease,
-    transform 0.2s ease,
-    box-shadow 0.2s ease;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+/* =========================================================
+   OVERLAY LAYER
+   Transparent to clicks so the globe stays draggable; each
+   overlay re-enables pointer events for itself.
+   ========================================================= */
+.globe-overlays {
+  position: absolute;
+  inset: 0;
+  z-index: var(--z-legend);
+  pointer-events: none;
 }
 
-.globe-container .cesium-button:hover {
-  background: rgba(26, 31, 38, 0.95) !important;
-  border-color: rgba(229, 234, 242, 0.2) !important;
-  color: rgba(229, 234, 242, 0.95) !important;
-  transform: translateY(-1px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
-}
-
-.globe-container .cesium-button:active {
-  transform: translateY(0);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
-}
-
-.globe-container .cesium-viewer-toolbar {
-  background: transparent !important;
-  border: none !important;
-  top: 16px !important;
-  right: 16px !important;
-}
-
-/* =========================
-   LOADING OVERLAY
-   ========================= */
-
+/* =========================================================
+   VIEWER BOOT
+   Covers the pane only, not the app — the rest of the UI is
+   usable while the 3D viewer starts.
+   ========================================================= */
 .globe-loading-overlay {
   position: absolute;
   inset: 0;
+  z-index: 100;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: var(--bg-space);
-  z-index: 100;
   gap: var(--space-4);
+  background: var(--color-bg-well);
 }
 
 .loading-spinner {
-  width: 48px;
-  height: 48px;
-  border: 4px solid rgba(255, 255, 255, 0.1);
-  border-top-color: var(--text-secondary);
-  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-neutral-800);
+  border-top-color: var(--color-accent);
+  border-radius: 0;
   animation: spin 1s linear infinite;
 }
 
 .loading-text {
-  font-size: var(--text-base);
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-  letter-spacing: 0.05em;
+  font-family: var(--font-heading);
+  font-size: var(--type-kicker);
+  font-weight: var(--weight-extrabold);
+  letter-spacing: var(--kicker-tracking);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* =========================
-   RESPONSIVE
-   ========================= */
-
-@media (max-width: 767px) {
-  .globe-container {
-    min-height: 0;
-  }
-
-  .globe-container .cesium-viewer-toolbar {
-    top: 8px !important;
-    right: 8px !important;
-  }
-
-  .globe-container .cesium-button {
-    padding: 8px !important;
-  }
-}
-
-/* =========================
-   PERFORMANCE OPTIMIZATIONS
-   ========================= */
-
-.globe-container .cesium-viewer canvas {
-  will-change: transform;
-  transform: translateZ(0);
-}
-
-/* Reduce motion for accessibility */
 @media (prefers-reduced-motion: reduce) {
-  .globe-container .cesium-button {
-    transition: none;
-  }
-
   .loading-spinner {
     animation: none;
-    border-top-color: var(--text-secondary);
+    border-top-color: var(--color-accent);
   }
 }

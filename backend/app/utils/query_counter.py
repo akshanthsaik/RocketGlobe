@@ -1,10 +1,9 @@
-from contextlib import contextmanager
 from sqlalchemy import event
-from typing import Iterator
 
 
 class QueryCounter:
     """Context manager that counts SQL statements executed by a SQLAlchemy Engine."""
+
     def __init__(self, engine):
         self.engine = engine
         self.count = 0

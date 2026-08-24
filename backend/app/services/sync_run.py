@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import logging
 import os
+import sys
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models import SyncRun, SyncState
+from app.utils.time import normalize_utc
 
+logger = logging.getLogger(__name__)
 
 RUNNING_STATUSES = ("queued", "running")
 
@@ -18,17 +23,55 @@ def _utcnow() -> datetime:
 
 
 def _parse_owner_pid(owner: Optional[str]) -> Optional[int]:
-    if not owner or ":pid:" not in owner:
+    """Extract the pid from a `"<label>:pid:<pid>"` lock_owner string.
+
+    Any owner string that doesn't match this format is logged and treated as
+    "no pid known" (dead-process detection is skipped for it, not assumed dead)
+    rather than failing silently.
+    """
+    if not owner:
+        return None
+    if ":pid:" not in owner:
+        logger.warning("lock_owner %r doesn't match expected '<label>:pid:<pid>' format", owner)
         return None
     try:
         return int(owner.rsplit(":pid:", 1)[1])
-    except Exception:
+    except (TypeError, ValueError):
+        logger.warning("lock_owner %r has non-integer pid suffix", owner)
         return None
+
+
+def _is_pid_alive_windows(pid: int) -> bool:
+    """Return True if pid looks like a live process (Windows).
+
+    os.kill(pid, 0) is unreliable here: it can fail with permissions or odd job
+    states even when the sync worker is still running, which incorrectly trips
+    stale-lock recovery and fails the run.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    ERROR_ACCESS_DENIED = 5
+    PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, wintypes.DWORD(pid))
+    if handle:
+        kernel32.CloseHandle(handle)
+        return True
+    err = kernel32.GetLastError()
+    # Process exists but we are not allowed to open it — treat as alive.
+    if err == ERROR_ACCESS_DENIED:
+        return True
+    return False
 
 
 def _is_pid_alive(pid: int) -> bool:
     if pid <= 0:
         return False
+
+    if sys.platform == "win32":
+        return _is_pid_alive_windows(pid)
 
     try:
         os.kill(pid, 0)
@@ -38,14 +81,6 @@ def _is_pid_alive(pid: int) -> bool:
         return False
 
     return True
-
-
-def _as_utc(value: Optional[datetime]) -> Optional[datetime]:
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        return value.replace(tzinfo=timezone.utc)
-    return value
 
 
 def serialize_sync_run(run: Optional[SyncRun]) -> Optional[dict[str, Any]]:
@@ -170,13 +205,9 @@ def recover_stale_sync_state(db: Session, ttl_seconds: int) -> dict[str, int]:
     changed = False
     marked_run_ids: set[int] = set()
 
-    runs = (
-        db.query(SyncRun)
-        .filter(SyncRun.is_active.is_(True), SyncRun.status.in_(RUNNING_STATUSES))
-        .all()
-    )
+    runs = db.query(SyncRun).filter(SyncRun.is_active.is_(True), SyncRun.status.in_(RUNNING_STATUSES)).all()
     for run in runs:
-        heartbeat = _as_utc(run.updated_at or run.started_at)
+        heartbeat = normalize_utc(run.updated_at or run.started_at)
         if heartbeat and heartbeat >= stale_before:
             continue
 
@@ -212,7 +243,7 @@ def recover_stale_sync_state(db: Session, ttl_seconds: int) -> dict[str, int]:
         active_run = None
 
     if lock_row and lock_row.is_locked:
-        locked_at = _as_utc(lock_row.locked_at)
+        locked_at = normalize_utc(lock_row.locked_at)
         lock_is_stale = False
 
         if owner_dead:
@@ -238,3 +269,52 @@ def recover_stale_sync_state(db: Session, ttl_seconds: int) -> dict[str, int]:
             return {"stale_runs": 0, "cleared_locks": 0}
 
     return {"stale_runs": stale_runs, "cleared_locks": cleared_locks}
+
+
+def get_launch_rate_limit_cooldown_seconds(
+    db: Session,
+    exclude_run_id: Optional[str] = None,
+) -> Optional[int]:
+    """Seconds remaining on the most recent LL2 launches rate-limit window, if any.
+
+    Single source of truth for this check - both the admin sync endpoint (before a
+    run exists, so `exclude_run_id` is None) and the sync worker itself (which
+    excludes its own in-progress run) call this instead of maintaining separate
+    copies that can drift apart.
+    """
+    now = _utcnow()
+    recent_runs = (
+        db.query(SyncRun)
+        .filter(SyncRun.run_id != exclude_run_id)
+        .order_by(SyncRun.started_at.desc())
+        .limit(10)
+        .all()
+    )
+
+    for run in recent_runs:
+        stats = run.stats if isinstance(run.stats, dict) else {}
+        rate_limited = stats.get("_rate_limited")
+        if not isinstance(rate_limited, dict):
+            continue
+
+        raw_wait = rate_limited.get("launches")
+        try:
+            wait_seconds = int(float(raw_wait))
+        except (TypeError, ValueError):
+            continue
+
+        if wait_seconds <= 0:
+            continue
+        # Normalize legacy runs that may have stored very large server windows.
+        wait_seconds = min(wait_seconds, settings.LL2_LAUNCHES_MAX_WAIT_SECONDS)
+
+        baseline = normalize_utc(run.finished_at or run.updated_at or run.started_at)
+        if baseline is None:
+            continue
+
+        elapsed = (now - baseline).total_seconds()
+        remaining = int(round(wait_seconds - elapsed))
+        if remaining > 0:
+            return remaining
+
+    return None

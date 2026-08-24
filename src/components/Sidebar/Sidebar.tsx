@@ -214,9 +214,7 @@ export function Sidebar() {
                 >
                   {item.label}
                 </button>
-                {!isCurrent && (
-                  <span className="breadcrumb-separator">/</span>
-                )}
+                {!isCurrent && <span className="breadcrumb-separator">/</span>}
               </div>
             );
           })}

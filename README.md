@@ -12,7 +12,7 @@ flowchart LR
   end
 
   API["FastAPI + SQLAlchemy"]
-  DB["PostgreSQL + PostGIS (recommended)"]
+  DB["SQLite (local file)"]
   LL2["Launch Library 2 API\nhttps://ll.thespacedevs.com/2.3.0"]
 
   UI <-->|HTTP JSON| API
@@ -84,6 +84,8 @@ flowchart TB
 - API base URL is `VITE_API_BASE_URL` and defaults to `http://127.0.0.1:8000/api`.
 - Initial data bootstrap retries API reads (up to 8 attempts) to tolerate backend startup lag.
 - Dev server runs on `http://localhost:1420` in Tauri dev mode.
+- Shared cross-component logic (pagination, per-entity launch counts/splits, debounced search, overlay positioning) lives in `src/hooks/`.
+- ESLint (`eslint.config.js`) + Prettier + `tsc --noEmit` for static checks; Vitest (`vitest.config.ts`) for unit tests, currently covering store selectors and the shared hooks.
 
 **Backend**
 
@@ -97,9 +99,9 @@ flowchart TB
 
 **Database**
 
-- Primary target is PostgreSQL with PostGIS. The `pads.location` column uses `Geography(POINT, 4326)` via GeoAlchemy2.
-- Migrations exist under `backend/alembic/versions`.
-- SQLite can be used for local/testing builds, but PostGIS-only location updates are skipped when not on PostgreSQL.
+- SQLite, stored as a single file (`DATABASE_URL=sqlite:///./rocketglobe.db` by default in dev). In packaged release builds it lives under the app's local data directory so each user's synced data persists across app updates.
+- Migrations exist under `backend/alembic/versions`. Alembic runs with `render_as_batch=True` on SQLite so future column changes go through the temp-table-rebuild path SQLite requires.
+- `pads.latitude`/`pads.longitude` are plain floats; there is no PostGIS/geospatial extension in use.
 
 ## Data Model (Backend)
 
@@ -111,7 +113,7 @@ Tables are defined under `backend/app/models`.
 
 **pads**
 
-- `ll2_id`, `name`, `latitude`, `longitude`, `location` (PostGIS), `country_code`, `map_url`, `total_launch_count`, `agency_id`
+- `ll2_id`, `name`, `latitude`, `longitude`, `country_code`, `map_url`, `total_launch_count`, `agency_id`
 
 **rockets**
 
@@ -206,6 +208,19 @@ Useful fields in `GET /admin/sync-status`:
 - `rate_limited_resources`: flattened map of resource -> retry seconds.
 - `POST /admin/sync` may return `retry_after_seconds` directly when a cooldown pre-check blocks the run.
 
+**Seed snapshot (`backend/tools/build_seed_snapshot.py`)**
+
+LL2's anonymous tier is ~15 requests/hour, which a fresh install's first full-history sync can exceed immediately (confirmed with The Space Devs: bulk-crawling once and caching a snapshot is the expected pattern, rather than every install re-crawling full history). This is a separate, deliberately patient tool — not the live per-user sync above — meant to be run by hand, unattended, for as long as a full crawl takes:
+
+```bash
+cd backend
+python tools/build_seed_snapshot.py --out seed_data/rocketglobe_seed.db
+```
+
+- Defaults to production LL2 regardless of `backend/.env` (a seed built from the dev sandbox's small dataset would be useless).
+- Sleeps through rate-limit windows instead of failing fast, and checkpoints progress to disk after every page, so it's safe to Ctrl+C and re-run to resume.
+- Resulting `.db` file is the historical seed intended to ship with the app (or be loaded once on first run); the live sync then only needs to fetch new/changed data per user.
+
 ## Sync Troubleshooting
 
 **Symptom: sync ends quickly with a rate-limit message**
@@ -228,7 +243,7 @@ curl.exe -s http://127.0.0.1:8000/admin/api-throttle
 ```
 
 2. Retry sync later, or increase wait budgets if you prefer waiting over skip/fail-fast:
-`LL2_MAX_WAIT_SECONDS`, `LL2_MAX_REQUEST_DURATION`, `LL2_LAUNCHES_MAX_WAIT_SECONDS`, `LL2_LAUNCHES_MAX_REQUEST_DURATION`.
+   `LL2_MAX_WAIT_SECONDS`, `LL2_MAX_REQUEST_DURATION`, `LL2_LAUNCHES_MAX_WAIT_SECONDS`, `LL2_LAUNCHES_MAX_REQUEST_DURATION`.
 
 3. Check backend startup logs for the active runtime config line:
 
@@ -266,35 +281,38 @@ Environment templates:
 
 Environment variables override code defaults. Confirm effective values from backend startup logs (`LL2 config: ...`).
 
-| Variable                   | Default                             | Purpose                                             |
-| -------------------------- | ----------------------------------- | --------------------------------------------------- |
-| `DATABASE_URL`             | none                                | SQLAlchemy DB URL                                   |
-| `LL2_BASE_URL`             | `https://ll.thespacedevs.com/2.3.0` | LL2 API root                                        |
-| `LL2_SYNC_INTERVAL`        | `900`                               | Defined but not currently scheduled in code         |
-| `LL2_SYNC_PAGE_LIMIT`      | `500`                               | Page size used for LL2 sync requests                |
-| `LL2_MIN_REQUEST_INTERVAL` | `2.0`                               | Minimum seconds between LL2 requests                |
-| `LL2_BASE_BACKOFF`         | `1.0`                               | Base backoff seconds                                |
-| `LL2_MAX_BACKOFF`          | `60.0`                              | Max backoff seconds                                 |
-| `LL2_MAX_RETRIES`          | `8`                                 | Max retries per non-launch request                  |
-| `LL2_MAX_WAIT_SECONDS`     | `120`                               | Max allowed throttle wait before fail-fast          |
-| `LL2_MAX_REQUEST_DURATION` | `300`                               | Max total retry budget (seconds) per request        |
-| `LL2_LAUNCHES_MIN_REQUEST_INTERVAL` | `2.5`                       | Launches-only minimum request spacing (seconds)     |
-| `LL2_LAUNCHES_MAX_RETRIES` | `20`                                | Launches-only max retries                           |
-| `LL2_LAUNCHES_MAX_WAIT_SECONDS` | `300`                          | Launches-only max allowed throttle wait             |
-| `LL2_LAUNCHES_MAX_REQUEST_DURATION` | `1800`                     | Launches-only max retry budget (seconds)            |
-| `LL2_STATIC_RESOURCES_MIN_INTERVAL` | `86400`                    | Skip agencies/pads/rockets sync if recently synced  |
-| `LL2_EXISTING_DATA_LOOKBACK_HOURS` | `24`                        | Fallback incremental baseline window when sync state is missing |
-| `LL2_ALLOW_PARTIAL_SYNC_ON_RATE_LIMIT` | `True`                  | If true, sync completes as partial when LL2 rate-limits a resource |
-| `SQL_ECHO`                 | `False`                             | SQLAlchemy SQL echo                                 |
-| `API_HOST`                 | `localhost`                         | Backend host setting                                |
-| `API_PORT`                 | `8000`                              | Backend port setting                                |
+| Variable                               | Default                             | Purpose                                                            |
+| -------------------------------------- | ----------------------------------- | ------------------------------------------------------------------ |
+| `DATABASE_URL`                         | none                                | SQLAlchemy DB URL                                                  |
+| `LL2_BASE_URL`                         | `https://ll.thespacedevs.com/2.3.0` | LL2 API root                                                       |
+| `LL2_SYNC_INTERVAL`                    | `900`                               | Defined but not currently scheduled in code                        |
+| `LL2_SYNC_PAGE_LIMIT`                  | `500`                               | Page size used for LL2 sync requests                               |
+| `LL2_MIN_REQUEST_INTERVAL`             | `2.0`                               | Minimum seconds between LL2 requests                               |
+| `LL2_BASE_BACKOFF`                     | `1.0`                               | Base backoff seconds                                               |
+| `LL2_MAX_BACKOFF`                      | `60.0`                              | Max backoff seconds                                                |
+| `LL2_MAX_RETRIES`                      | `8`                                 | Max retries per non-launch request                                 |
+| `LL2_MAX_WAIT_SECONDS`                 | `120`                               | Max allowed throttle wait before fail-fast                         |
+| `LL2_MAX_REQUEST_DURATION`             | `300`                               | Max total retry budget (seconds) per request                       |
+| `LL2_LAUNCHES_MIN_REQUEST_INTERVAL`    | `2.5`                               | Launches-only minimum request spacing (seconds)                    |
+| `LL2_LAUNCHES_MAX_RETRIES`             | `20`                                | Launches-only max retries                                          |
+| `LL2_LAUNCHES_MAX_WAIT_SECONDS`        | `300`                               | Launches-only max allowed throttle wait                            |
+| `LL2_LAUNCHES_MAX_REQUEST_DURATION`    | `1800`                              | Launches-only max retry budget (seconds)                           |
+| `LL2_STATIC_RESOURCES_MIN_INTERVAL`    | `86400`                             | Skip agencies/pads/rockets sync if recently synced                 |
+| `LL2_EXISTING_DATA_LOOKBACK_HOURS`     | `24`                                | Fallback incremental baseline window when sync state is missing    |
+| `LL2_ALLOW_PARTIAL_SYNC_ON_RATE_LIMIT` | `True`                              | If true, sync completes as partial when LL2 rate-limits a resource |
+| `SQL_ECHO`                             | `False`                             | SQLAlchemy SQL echo                                                |
+| `API_HOST`                             | `localhost`                         | Backend host setting                                               |
+| `API_PORT`                             | `8000`                              | Backend port setting                                               |
 
 **Frontend env vars**
 
-| Variable                       | Default                     | Purpose                           |
-| ------------------------------ | --------------------------- | --------------------------------- |
-| `VITE_API_BASE_URL`            | `http://127.0.0.1:8000/api` | Base URL for API calls            |
-| `VITE_CESIUM_ION_ACCESS_TOKEN` | none                        | Cesium Ion token for globe assets |
+| Variable            | Default                     | Purpose                |
+| ------------------- | --------------------------- | ---------------------- |
+| `VITE_API_BASE_URL` | `http://127.0.0.1:8000/api` | Base URL for API calls |
+
+The globe renders without imagery tiles — a flat ground with country outlines
+drawn from GeoJSON — so no Cesium Ion token is required and the globe works
+with no network.
 
 **Tauri env vars**
 
@@ -310,22 +328,17 @@ Environment variables override code defaults. Confirm effective values from back
 - Bun
 - Rust toolchain (for Tauri)
 - Python 3.x (for backend dev/build tooling)
-- PostgreSQL with PostGIS enabled (recommended runtime database)
 
-**Database setup (PostgreSQL/PostGIS)**
+No separate database server is required — the backend uses SQLite, a single local file.
 
-```sql
-CREATE EXTENSION IF NOT EXISTS postgis;
-```
-
-If you use Alembic migrations:
+**Database setup**
 
 ```bash
 cd backend
 alembic upgrade head
 ```
 
-If you prefer SQLAlchemy metadata creation:
+If you prefer SQLAlchemy metadata creation instead of migrations:
 
 ```bash
 cd backend
@@ -338,9 +351,10 @@ python -c "from app.database import init_db; init_db()"
 cd backend
 python -m venv venv
 venv\Scripts\pip install -r requirements.txt
-set DATABASE_URL=postgresql+psycopg2://user:pass@localhost:5432/rocketglobe
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
+
+`DATABASE_URL` defaults to `sqlite:///./rocketglobe.db` (relative to `backend/`) if unset.
 
 For long-running sync debugging, prefer running without `--reload`.
 
@@ -349,6 +363,10 @@ For long-running sync debugging, prefer running without `--reload`.
 ```bash
 bun install
 bun run dev
+bun run check    # tsc --noEmit
+bun run lint     # eslint
+bun run format   # prettier --write
+bun run test     # vitest run
 ```
 
 **Tauri dev**
@@ -369,16 +387,12 @@ bun run tauri dev
 Current Tauri bundle resources are configured in `src-tauri/tauri.conf.json`:
 
 - `src-tauri/resources/backend/run_backend.exe`
-- `src-tauri/resources/postgres/bin`
-- `src-tauri/resources/postgres/lib`
-- `src-tauri/resources/postgres/share`
 
 Important behavior:
 
-- Debug build: Tauri starts backend via `backend/venv` Python + `uvicorn`.
-- Release build: Tauri starts bundled `run_backend.exe`.
+- Debug build: Tauri starts backend via `backend/venv` Python + `uvicorn`. `DATABASE_URL` comes from `backend/.env`, defaulting to `sqlite:///./rocketglobe.db`.
+- Release build: Tauri starts bundled `run_backend.exe` with `DATABASE_URL` pointed at `<app_local_data_dir>/rocketglobe.db` (see `resolve_release_database_url` in `src-tauri/src/lib.rs`), so each user's synced data lives in a single file that persists across app updates.
 - `src-tauri/resources/` is gitignored in this repo, so those artifacts must exist locally before `tauri build`.
-- Release runtime initializes and starts bundled PostgreSQL binaries automatically (using app-local `pgdata`) before launching backend.
 
 ## Windows Release
 
@@ -387,18 +401,8 @@ This path keeps the current architecture: Tauri desktop app + local backend proc
 1. Ensure required resource files exist:
 
 - `src-tauri/resources/backend/run_backend.exe`
-- `src-tauri/resources/postgres/bin`
-- `src-tauri/resources/postgres/lib`
-- `src-tauri/resources/postgres/share`
 
-2. Set release inputs in your shell (recommended):
-
-```powershell
-$env:DATABASE_URL="postgresql+psycopg2://user:pass@localhost:5432/rocketglobe"
-$env:VITE_CESIUM_ION_ACCESS_TOKEN="your_cesium_token"
-```
-
-3. Run the release pipeline:
+2. Run the release pipeline:
 
 ```powershell
 bun run release:windows
@@ -427,18 +431,17 @@ Output artifacts are placed under:
 ### Runtime Requirements On Target Machines
 
 - System Python is not required for release mode when using bundled `run_backend.exe`.
-- A standalone PostgreSQL install is not required for the bundled desktop runtime.
-- The release app uses bundled PostgreSQL + app-local data directory for `DATABASE_URL`.
+- No database server is required on the target machine — SQLite is a single file managed entirely by the app.
 
 ## Project Context
 
 This project was built as an exploratory learning project and evolved over roughly 4 months. It was not originally scoped as a production-grade architecture exercise, so some decisions favor iteration speed over clean system boundaries.
 
-For full context: most Rust and PostGIS work was heavily assisted (vibe-coded), and much of the frontend optimization was done with Codex and older Claude models depending on what free tooling was available.
+For full context: most Rust work was heavily assisted (vibe-coded), and much of the frontend optimization was done with Codex and older Claude models depending on what free tooling was available. The backend originally used PostgreSQL + PostGIS; it was migrated to SQLite since the app is a single-user local mirror of LL2 data and never used PostGIS's spatial query functions (pad coordinates are plain lat/lon floats).
 
 ## Known Limitations
 
 - Backend process management is coupled to Tauri startup and can be fragile across environments.
-- LL2 throttling behavior can still limit how fresh launches data can be in a given sync window.
-- Release resources (`run_backend.exe`, postgres binaries) are expected to exist locally and are not produced by a single unified pipeline in this repo.
+- LL2 throttling behavior can still limit how fresh launches data can be in a given sync window, especially on the very first full sync.
+- Release resources (`run_backend.exe`) are expected to exist locally and are not produced by a single unified pipeline in this repo.
 - Architectural boundaries between desktop runtime, backend runtime, and data layer are functional but not yet minimal.

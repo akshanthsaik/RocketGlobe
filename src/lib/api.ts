@@ -2,6 +2,31 @@ export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
 export const API_ORIGIN = new URL(API_BASE_URL).origin;
+const ADMIN_TOKEN = import.meta.env.VITE_ADMIN_TOKEN?.trim();
+
+export function getAdminAuthHeaders(): HeadersInit {
+  if (!ADMIN_TOKEN) {
+    return {};
+  }
+
+  return { "X-Admin-Token": ADMIN_TOKEN };
+}
+
+/**
+ * fetch() against an /admin/* endpoint with auth headers merged in. Returns
+ * the raw Response rather than throwing on non-ok status - admin callers
+ * (e.g. the sync trigger) need to branch on specific status codes like
+ * 409/429 as meaningful responses, not exceptions.
+ */
+export async function adminFetch(
+  path: string,
+  init?: RequestInit,
+): Promise<Response> {
+  return fetch(`${API_ORIGIN}${path}`, {
+    ...init,
+    headers: { ...getAdminAuthHeaders(), ...init?.headers },
+  });
+}
 
 // Types matching backend schemas
 export interface Agency {
@@ -69,11 +94,67 @@ export interface Launch {
   video_url?: string | null;
 }
 
-export const LAUNCH_STATUS = {
-  UPCOMING: ["Go", "TBD", "TBC", "On Hold", "To Be Confirmed", "To Be Determined"],
+// Typed as readonly string[] (rather than inferred literal tuples via
+// `as const`) so `.includes(launch.status)` accepts any string directly,
+// without a cast at every call site.
+/**
+ * A single sync run, as reported by GET /admin/sync-status.
+ *
+ * The resources are synced in this order and each one becomes
+ * `current_resource` while it runs — agencies first because pads, rockets and
+ * launches all resolve foreign keys against agency rows.
+ */
+export const SYNC_STAGES = ["agencies", "pads", "rockets", "launches"] as const;
+
+export type SyncStage = (typeof SYNC_STAGES)[number];
+
+export type SyncRunStatus =
+  | "queued"
+  | "running"
+  | "success"
+  | "partial"
+  | "failed"
+  | "blocked";
+
+export interface SyncRun {
+  run_id: string;
+  status: SyncRunStatus | string;
+  is_active: boolean;
+  current_resource: string | null;
+  progress_done: number | null;
+  progress_total: number | null;
+  /** Per-resource row counts, plus `_skipped` (string[]) and `_rate_limited`
+   *  (resource -> seconds). Loosely typed because the worker owns its shape. */
+  stats: Record<string, unknown> | null;
+  message: string | null;
+  error: string | null;
+  started_at: string | null;
+  updated_at: string | null;
+  finished_at: string | null;
+}
+
+export interface SyncStatusResponse {
+  status: string;
+  is_sync_running: boolean;
+  run: SyncRun | null;
+  rate_limited_resources?: Record<string, number>;
+  retry_after_seconds?: number | null;
+}
+
+export const LAUNCH_STATUS: {
+  UPCOMING: readonly string[];
+  DECIDED: readonly string[];
+  PREVIOUS: readonly string[];
+} = {
+  UPCOMING: ["TBD", "TBC", "On Hold", "To Be Confirmed", "To Be Determined"],
   DECIDED: ["Go for Launch", "Go"],
-  PREVIOUS: ["Success", "Failure", "Partial Failure", "Success (Partial Failure)"],
-} as const;
+  PREVIOUS: [
+    "Success",
+    "Failure",
+    "Partial Failure",
+    "Success (Partial Failure)",
+  ],
+};
 
 class RocketGlobeAPI {
   private baseURL: string;
@@ -93,7 +174,9 @@ class RocketGlobeAPI {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`API Error ${response.status}: ${errorText || response.statusText}`);
+        throw new Error(
+          `API Error ${response.status}: ${errorText || response.statusText}`,
+        );
       }
 
       return (await response.json()) as T;
@@ -101,7 +184,7 @@ class RocketGlobeAPI {
       if (error instanceof Error) {
         throw error;
       }
-      throw new Error(`Unknown error fetching ${url}`);
+      throw new Error(`Unknown error fetching ${url}`, { cause: error });
     }
   }
 
@@ -203,9 +286,17 @@ class RocketGlobeAPI {
     return this.fetch<Rocket>(`/rockets/${id}`);
   }
 
-  async healthCheck(): Promise<{ status: string; database?: string; data?: unknown }> {
+  async healthCheck(): Promise<{
+    status: string;
+    database?: string;
+    data?: unknown;
+  }> {
     const url = `${API_ORIGIN}/health`;
-    return this.fetchAbsolute<{ status: string; database?: string; data?: unknown }>(url);
+    return this.fetchAbsolute<{
+      status: string;
+      database?: string;
+      data?: unknown;
+    }>(url);
   }
 }
 

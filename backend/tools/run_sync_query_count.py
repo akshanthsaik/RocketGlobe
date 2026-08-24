@@ -1,20 +1,18 @@
 import asyncio
+import pathlib
+import sys
 from datetime import datetime, timezone
-import random
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-import sys
-import pathlib
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent.parent))
 
-from app.models.base import Base
 from app.models.agency import Agency
 from app.models.rockets import Rocket
 from app.models.sync_state import SyncState
-from app.workers.sync_worker import sync_agencies, sync_rockets, sync_launches
 from app.utils.query_counter import QueryCounter
-from app.database import engine as app_engine
+from app.workers.sync_worker import sync_agencies, sync_launches, sync_rockets
 
 
 class MockClient:
@@ -47,13 +45,14 @@ def make_pages(n, prefix, updated_ts):
 
 
 def run():
-    engine = create_engine('sqlite:///:memory:', connect_args={"check_same_thread": False})
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     # create tables needed
     Agency.__table__.create(bind=engine, checkfirst=True)
     Rocket.__table__.create(bind=engine, checkfirst=True)
     SyncState.__table__.create(bind=engine, checkfirst=True)
     # Create launches table for testing sync_launches
     from app.models.launch import Launch
+
     Launch.__table__.create(bind=engine, checkfirst=True)
 
     Session = sessionmaker(bind=engine)
@@ -84,5 +83,5 @@ def run():
     print(f"Launches sync executed {qc3.count} SQL statements")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run()

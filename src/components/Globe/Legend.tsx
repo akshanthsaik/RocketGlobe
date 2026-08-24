@@ -1,100 +1,37 @@
 // src/components/Globe/Legend.tsx
-import type { CSSProperties } from "react";
+import type { GlobeMode } from "../../store/launchStore";
+import { PAD_TIERS } from "./padTiers";
 import "./Legend.css";
 
 interface LegendProps {
-  mode: "launches" | "pads" | "rockets" | "agencies" | "heatmap" | "trajectories" | "timeline";
-  timelineActive?: boolean;
+  mode: GlobeMode;
 }
 
-export function Legend({ mode, timelineActive = false }: LegendProps) {
-  if (mode === "heatmap" || mode === "agencies" || mode === "rockets") return null;
-
-  const overlayStyle = {
-    "--overlay-bottom-desktop": timelineActive
-      ? "calc(var(--space-6) + var(--timeline-height))"
-      : "var(--space-6)",
-    "--overlay-bottom-mobile": timelineActive
-      ? "calc(var(--space-4) + var(--timeline-height-mobile))"
-      : "var(--space-4)",
-  } as CSSProperties;
+export function Legend({ mode }: LegendProps) {
+  // The ramp only describes pad markers, which the rocket and agency modes
+  // do not draw by activity.
+  if (mode === "agencies" || mode === "rockets") return null;
 
   return (
-    <div className="globe-legend" style={overlayStyle}>
-      <div className="legend-title">
-        {mode === "trajectories" ? "Launch Status" : "Launch Activity"}
-      </div>
+    <div className="globe-legend">
+      <div className="legend-title">Pad activity — lifetime launches</div>
       <div className="legend-items">
-        {mode === "trajectories" ? (
-          <>
-            <div className="legend-item">
-              <div
-                className="legend-color"
-                style={{ background: "#dde2ea" }}
-              ></div>
-              <span>Success</span>
-            </div>
-            <div className="legend-item">
-              <div
-                className="legend-color"
-                style={{ background: "#c8ced8" }}
-              ></div>
-              <span>Partial</span>
-            </div>
-            <div className="legend-item">
-              <div
-                className="legend-color"
-                style={{ background: "#b3bbc8" }}
-              ></div>
-              <span>Failure</span>
-            </div>
-            <div className="legend-item">
-              <div
-                className="legend-color"
-                style={{ background: "#98a2b2" }}
-              ></div>
-              <span>Unknown</span>
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="legend-item">
-              <div
-                className="legend-color"
-                style={{ background: "#dde2ea" }}
-              ></div>
-              <span>100+ launches</span>
-            </div>
-            <div className="legend-item">
-              <div
-                className="legend-color"
-                style={{ background: "#c8ced8" }}
-              ></div>
-              <span>50-100 launches</span>
-            </div>
-            <div className="legend-item">
-              <div
-                className="legend-color"
-                style={{ background: "#b3bbc8" }}
-              ></div>
-              <span>20-50 launches</span>
-            </div>
-            <div className="legend-item">
-              <div
-                className="legend-color"
-                style={{ background: "#98a2b2" }}
-              ></div>
-              <span>1-20 launches</span>
-            </div>
-            <div className="legend-item">
-              <div
-                className="legend-color"
-                style={{ background: "#7f8899" }}
-              ></div>
-              <span>No launches</span>
-            </div>
-          </>
-        )}
+        {PAD_TIERS.map((tier) => (
+          <div key={tier.label} className="legend-item">
+            {/* Swatches carry each tier's real marker size, so the legend is a
+                key to the globe rather than a colour chart beside it. */}
+            <span
+              className="legend-swatch"
+              style={{
+                width: `${tier.size}px`,
+                height: `${tier.size}px`,
+                background: tier.fill ?? "transparent",
+                borderColor: tier.fill ?? "#605d5d",
+              }}
+            />
+            <span className="legend-label">{tier.label}</span>
+          </div>
+        ))}
       </div>
     </div>
   );

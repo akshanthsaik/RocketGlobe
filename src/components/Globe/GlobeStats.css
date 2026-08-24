@@ -1,0 +1,52 @@
+/* =========================================================
+   GLOBE STAT TILES
+   Top-left of the globe pane. Flat panels with a 2px edge —
+   the globe shows through around them, not behind them.
+   ========================================================= */
+.globe-stats {
+  position: absolute;
+  top: var(--overlay-gutter);
+  left: var(--overlay-gutter);
+  z-index: var(--z-legend);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  min-width: 0;
+  pointer-events: auto;
+}
+
+.globe-stat {
+  padding: 7px 14px 8px;
+  background: var(--color-bg);
+  border: 2px solid var(--color-neutral-800);
+}
+
+.globe-stat-label {
+  margin-bottom: 1px;
+  font-size: var(--type-kicker);
+  letter-spacing: var(--kicker-tracking);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.globe-stat-value {
+  font-family: var(--font-heading);
+  font-weight: var(--weight-extrabold);
+  font-size: var(--type-stat);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-tight);
+  line-height: 1.1;
+  color: var(--color-text);
+}
+
+@media (max-width: 767px) {
+  .globe-stats {
+    top: var(--space-3);
+    left: var(--space-3);
+  }
+
+  .globe-stat {
+    padding: 5px 10px 6px;
+  }
+}

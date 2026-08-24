@@ -1,10 +1,15 @@
 // src/components/Sidebar/tabs/PadsTab.tsx
-import { useEffect, useMemo, useState } from "react";
-import type { KeyboardEvent, UIEvent } from "react";
+import { useMemo, useState } from "react";
+import type { KeyboardEvent } from "react";
 import { useLaunchStore } from "../../../store/launchStore";
+import { usePaginatedList } from "../../../hooks/usePaginatedList";
+import { useEntityLaunchCounts } from "../../../hooks/useEntityLaunchCounts";
+import { useDebouncedCallback } from "../../../hooks/useDebouncedCallback";
+import { SearchField } from "../../common/SearchField";
 import "./Tab.css";
 
-const PAGE_SIZE = 200;
+const PAGE_SIZE = 150;
+const SEARCH_DEBOUNCE_MS = 200;
 
 export function PadsTab() {
   const pads = useLaunchStore((state) => state.pads);
@@ -13,24 +18,24 @@ export function PadsTab() {
   const padSearchQuery = useLaunchStore((state) => state.padSearchQuery);
   const setPadSearchQuery = useLaunchStore((state) => state.setPadSearchQuery);
   const [sortBy, setSortBy] = useState<"name" | "launches">("launches");
-  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
+  const [searchInput, setSearchInput] = useState(padSearchQuery);
+  const debouncedSetPadSearchQuery = useDebouncedCallback(
+    setPadSearchQuery,
+    SEARCH_DEBOUNCE_MS,
+  );
 
-  useEffect(() => {
-    setVisibleCount(PAGE_SIZE);
-  }, [padSearchQuery, sortBy, pads.length, launches.length]);
+  const handleSearchChange = (value: string) => {
+    setSearchInput(value);
+    debouncedSetPadSearchQuery(value);
+  };
 
-  const padCounts = useMemo(() => {
-    const counts = new Map<number, number>();
-    for (const launch of launches) {
-      if (launch.pad_id == null) continue;
-      counts.set(launch.pad_id, (counts.get(launch.pad_id) || 0) + 1);
-    }
-    return counts;
-  }, [launches]);
+  const padCounts = useEntityLaunchCounts(launches, "pad_id");
 
   const sortedPads = useMemo(() => {
     const query = padSearchQuery.toLowerCase();
-    let filtered = pads.filter((pad) => pad.name.toLowerCase().includes(query));
+    const filtered = pads.filter((pad) =>
+      pad.name.toLowerCase().includes(query),
+    );
 
     const padsWithCounts = filtered.map((pad) => ({
       ...pad,
@@ -45,16 +50,13 @@ export function PadsTab() {
     });
   }, [pads, padCounts, padSearchQuery, sortBy]);
 
-  const visiblePads = sortedPads.slice(0, visibleCount);
-  const canLoadMore = sortedPads.length > visibleCount;
-
-  const handleListScroll = (event: UIEvent<HTMLDivElement>) => {
-    if (!canLoadMore) return;
-    const target = event.currentTarget;
-    if (target.scrollHeight - target.scrollTop - target.clientHeight < 200) {
-      setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, sortedPads.length));
-    }
-  };
+  const {
+    visibleItems: visiblePads,
+    visibleCount,
+    canLoadMore,
+    loadMore,
+    onScroll,
+  } = usePaginatedList(sortedPads, PAGE_SIZE);
 
   const handlePadKeyDown = (
     event: KeyboardEvent<HTMLDivElement>,
@@ -69,35 +71,36 @@ export function PadsTab() {
   return (
     <div className="pads-tab">
       <div className="tab-header">
-        <input
-          type="text"
-          placeholder="Search pads..."
-          value={padSearchQuery}
-          onChange={(e) => setPadSearchQuery(e.target.value)}
-          className="search-input"
-          aria-label="Search launch pads"
+        <SearchField
+          value={searchInput}
+          onChange={handleSearchChange}
+          placeholder="Search pads by name"
         />
-        <div className="sort-buttons">
-          <button
-            className={`sort-btn ${sortBy === "launches" ? "active" : ""}`}
-            type="button"
-            onClick={() => setSortBy("launches")}
-          >
-            By Activity
-          </button>
-          <button
-            className={`sort-btn ${sortBy === "name" ? "active" : ""}`}
-            type="button"
-            onClick={() => setSortBy("name")}
-          >
-            By Name
-          </button>
+        <div>
+          <span className="sort-label">Order</span>
+          <div className="sort-buttons">
+            <button
+              className={`sort-btn ${sortBy === "launches" ? "active" : ""}`}
+              type="button"
+              onClick={() => setSortBy("launches")}
+            >
+              By activity
+            </button>
+            <button
+              className={`sort-btn ${sortBy === "name" ? "active" : ""}`}
+              type="button"
+              onClick={() => setSortBy("name")}
+            >
+              By name
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="pads-list" onScroll={handleListScroll}>
+      <div className="pads-list" onScroll={onScroll}>
         <div className="list-count">
-          {Math.min(visibleCount, sortedPads.length)} of {sortedPads.length} pads
+          {Math.min(visibleCount, sortedPads.length)} of {sortedPads.length}{" "}
+          pads
         </div>
         {visiblePads.map((pad) => (
           <div
@@ -124,21 +127,17 @@ export function PadsTab() {
 
         {sortedPads.length === 0 && (
           <div className="empty-state">
-            <div className="empty-state-title">No pads found</div>
+            <div className="empty-state-rule" />
+            <div className="empty-state-title">No pads match that</div>
             <div className="empty-state-text">
-              Try a different search term.
+              The whole database is already on this machine — this is a search
+              result, not a loading state.
             </div>
           </div>
         )}
 
         {canLoadMore && (
-          <button
-            className="load-more-btn"
-            type="button"
-            onClick={() =>
-              setVisibleCount((prev) => Math.min(prev + PAGE_SIZE, sortedPads.length))
-            }
-          >
+          <button className="load-more-btn" type="button" onClick={loadMore}>
             Load more
           </button>
         )}

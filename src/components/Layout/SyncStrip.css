@@ -1,0 +1,141 @@
+/* =========================================================
+   SYNC STRIP
+   Occupies the shell's middle row while a run is in flight,
+   so progress pushes the layout instead of covering it.
+   ========================================================= */
+.sync-strip {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 20px;
+  padding: 10px 20px;
+  background: var(--color-surface);
+  border-bottom: var(--rule-section);
+}
+
+.sync-strip-head {
+  min-width: 0;
+}
+
+.sync-strip-kicker {
+  margin-bottom: 2px;
+  font-size: var(--type-kicker);
+  letter-spacing: var(--kicker-tracking);
+  text-transform: uppercase;
+  color: var(--color-accent-400);
+}
+
+.sync-strip-title {
+  font-family: var(--font-heading);
+  font-weight: var(--weight-extrabold);
+  font-size: var(--type-row);
+  color: var(--color-text);
+}
+
+/* =========================================================
+   STAGES
+   Four equal cells. The top rule carries the state, so the
+   sequence reads as a progress track rather than four chips.
+   ========================================================= */
+.sync-strip-stages {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sync-stage {
+  min-width: 0;
+  padding: 7px 10px;
+  background: var(--color-bg);
+  border-top: 2px solid var(--color-neutral-800);
+  color: var(--color-text-muted);
+}
+
+.sync-stage-name {
+  font-size: var(--type-micro);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.02em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sync-stage-detail {
+  font-size: var(--type-micro);
+  font-variant-numeric: tabular-nums;
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Finished work is legible but recedes. */
+.sync-stage-done {
+  border-top-color: var(--color-neutral-600);
+  color: var(--color-text-3);
+}
+
+/* The running stage is the only accent-topped cell in the strip. */
+.sync-stage-active {
+  background: var(--color-surface-raised);
+  border-top-color: var(--color-accent);
+  color: var(--color-text);
+}
+
+.sync-stage-active .sync-stage-detail {
+  color: var(--color-accent-400);
+  opacity: 1;
+}
+
+/* Skipped is a non-event — the resource was already current. */
+.sync-stage-skipped {
+  color: var(--color-text-dim);
+}
+
+/* Throttled by the upstream API. Not a failure, but the one state the user
+   may need to act on, so it keeps colour after the run ends. */
+.sync-stage-blocked {
+  border-top-color: var(--color-accent-700);
+  color: var(--color-accent-300);
+}
+
+.sync-stage-pending {
+  color: var(--color-text-dim);
+}
+
+.sync-strip-note {
+  margin: 0;
+  max-width: 300px;
+  font-size: var(--type-meta);
+  line-height: 1.45;
+  color: var(--color-text-3);
+}
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+@media (max-width: 1100px) {
+  .sync-strip {
+    grid-template-columns: 160px minmax(0, 1fr);
+    gap: 14px;
+  }
+
+  .sync-strip-note {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  .sync-strip {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+    padding: 10px 14px;
+  }
+
+  .sync-stage {
+    padding: 6px 8px;
+  }
+}

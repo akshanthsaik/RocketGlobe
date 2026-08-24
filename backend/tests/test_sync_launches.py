@@ -1,23 +1,30 @@
 import asyncio
 from datetime import datetime, timezone
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from app.models.base import Base
-from app.models.launch import Launch
 from app.models.agency import Agency
+from app.models.launch import Launch
 from app.models.pad import Pad
 from app.models.rockets import Rocket
 from app.models.sync_state import SyncState
-from app.workers.sync_worker import sync_launches
 from app.utils.query_counter import QueryCounter
+from app.workers.sync_worker import sync_launches
 
 
 class MockClient:
     def __init__(self, pages):
         self.pages = pages
         self.calls = 0
+        # sync_launches temporarily widens these rate-limit budgets on whatever
+        # client it's given, then restores them - a real LL2Client always has them.
+        self.min_request_interval = 0.0
+        self.base_min_request_interval = 0.0
+        self.max_retries = 1
+        self.max_wait_seconds = 1
+        self.max_request_duration = 1
 
     async def get_launches(self, params=None, limit=None, offset=None):
         if self.calls < len(self.pages):
@@ -30,7 +37,7 @@ class MockClient:
 
 @pytest.fixture
 def in_memory_db():
-    engine = create_engine('sqlite:///:memory:', connect_args={"check_same_thread": False})
+    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
     # Create only tables we need
     Agency.__table__.create(bind=engine, checkfirst=True)
     Pad.__table__.create(bind=engine, checkfirst=True)
@@ -48,15 +55,17 @@ def in_memory_db():
 def make_pages(n, prefix, updated_ts):
     page = {"results": [], "count": n}
     for i in range(1, n + 1):
-        page["results"].append({
-            "id": f"{prefix}-{i}",
-            "name": f"{prefix} {i}",
-            "net": updated_ts,
-            "pad": {"id": i},
-            "rocket": {"configuration": {"id": i}},
-            "launch_service_provider": {"id": i},
-            "updated": updated_ts,
-        })
+        page["results"].append(
+            {
+                "id": f"{prefix}-{i}",
+                "name": f"{prefix} {i}",
+                "net": updated_ts,
+                "pad": {"id": i},
+                "rocket": {"configuration": {"id": i}},
+                "launch_service_provider": {"id": i},
+                "updated": updated_ts,
+            }
+        )
     return [page]
 
 

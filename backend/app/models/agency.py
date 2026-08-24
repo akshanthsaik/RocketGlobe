@@ -1,5 +1,7 @@
-from sqlalchemy import Column, Integer, String, Text, Boolean
+from sqlalchemy import Boolean, Column, Integer, Text
+
 from .base import Base, TimestampMixin
+
 
 class Agency(Base, TimestampMixin):
     __tablename__ = "agencies"

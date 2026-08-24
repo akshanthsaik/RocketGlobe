@@ -1,0 +1,32 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="globe" cx="38%" cy="34%" r="75%">
+      <stop offset="0%" stop-color="#232935" />
+      <stop offset="100%" stop-color="#12151b" />
+    </radialGradient>
+  </defs>
+
+  <circle cx="512" cy="512" r="500" fill="#0a0c0f" />
+
+  <circle cx="512" cy="512" r="220" fill="url(#globe)" stroke="#3a3025" stroke-width="6" />
+
+  <ellipse
+    cx="512"
+    cy="512"
+    rx="400"
+    ry="150"
+    fill="none"
+    stroke="#c1633c"
+    stroke-width="34"
+    stroke-linecap="round"
+    transform="rotate(-24 512 512)"
+  />
+
+  <circle
+    cx="512"
+    cy="512"
+    r="34"
+    fill="#dd7a4e"
+    transform="rotate(-24 512 512) translate(400 0)"
+  />
+</svg>

@@ -316,9 +316,10 @@ with no network.
 
 **Tauri env vars**
 
-| Variable                      | Default | Purpose                         |
-| ----------------------------- | ------- | ------------------------------- |
-| `ROCKETGLOBE_DISABLE_BACKEND` | unset   | If truthy, do not spawn backend |
+| Variable                          | Default | Purpose                                                                                 |
+| ---------------------------------- | ------- | ----------------------------------------------------------------------------------------- |
+| `ROCKETGLOBE_DISABLE_BACKEND`     | unset   | If truthy, do not spawn backend                                                         |
+| `ROCKETGLOBE_FORCE_SPAWN_BACKEND` | unset   | Debug mode only: spawn the embedded uvicorn even if `127.0.0.1:8000` is already in use   |
 
 ## Development
 
@@ -381,6 +382,16 @@ venv\Scripts\pip install -r requirements.txt
 cd ..
 bun run tauri dev
 ```
+
+**CI** (`.github/workflows/ci.yml`)
+
+Three jobs run on every push/PR to `main`/`develop`:
+
+- `frontend` (Windows runner): `bun install`, `bun run check`, `bun run format:check`. The Tauri build itself is currently skipped in CI.
+- `backend` (Ubuntu runner): `ruff check .`, `ruff format --check .`, `alembic upgrade head`, `pytest tests/`.
+- `lint` (Ubuntu runner): checks that the latest commit message starts with a Conventional Commits type (`feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert:`); non-blocking.
+
+`bun run lint` and `bun run test` are not run in CI — run them locally before considering frontend work done.
 
 ## Packaging Notes
 

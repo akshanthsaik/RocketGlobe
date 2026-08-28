@@ -90,7 +90,7 @@ export function formatDateShort(dateString?: string | null): string {
  * unreadable, so the UI shows a short human label and carries the raw string
  * through as a tooltip. `variant` drives the chip's colour treatment.
  */
-export type LaunchChipVariant =
+type LaunchChipVariant =
   | "go"
   | "pending"
   | "hold"
@@ -99,7 +99,7 @@ export type LaunchChipVariant =
   | "lost"
   | "unknown";
 
-export interface LaunchChip {
+interface LaunchChip {
   label: string;
   variant: LaunchChipVariant;
   /** The feed's original status string, for `title`. Null when unrecorded. */
@@ -217,15 +217,18 @@ export function normalizeCountryCode(
 }
 
 /**
- * Get country flag emoji from country code
+ * Regional-indicator flag emoji (built from the two letter codepoints, e.g.
+ * "GB" -> the two symbols that compose into a flag) render as an actual flag
+ * on macOS/iOS, but Windows' Segoe UI Emoji ships no flag glyphs at all — by
+ * Microsoft's own design, for geopolitical neutrality — so on this app's
+ * target platform they render as two boxed letters identical to the code
+ * itself. This used to build that emoji sequence; it now just returns the
+ * normalized code text, since the emoji never read as a flag here anyway.
  */
-export function getCountryFlag(countryCode?: string | null): string {
+export function getCountryLabel(countryCode?: string | null): string {
   const normalized = normalizeCountryCode(countryCode);
   if (!normalized || normalized.length !== 2) return DEFAULT_COUNTRY_LABEL;
-  return normalized
-    .split("")
-    .map((char) => String.fromCodePoint(127397 + char.charCodeAt(0)))
-    .join("");
+  return normalized;
 }
 
 /**

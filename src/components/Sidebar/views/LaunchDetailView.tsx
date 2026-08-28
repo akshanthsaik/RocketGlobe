@@ -4,7 +4,7 @@ import { Launch } from "../../../lib/api";
 import {
   formatDate,
   formatCoordinates,
-  getCountryFlag,
+  getCountryLabel,
   getLaunchChip,
 } from "../../../lib/utils";
 import { BackButton } from "../../common/BackButton";
@@ -69,7 +69,7 @@ export function LaunchDetailView({ launch }: LaunchDetailViewProps) {
           mono: (agency.abbrev || agency.name).slice(0, 2).toUpperCase(),
           title: agency.name,
           meta: [
-            agency.country_code ? getCountryFlag(agency.country_code) : null,
+            agency.country_code ? getCountryLabel(agency.country_code) : null,
             agency.type,
           ]
             .filter(Boolean)
@@ -90,7 +90,7 @@ export function LaunchDetailView({ launch }: LaunchDetailViewProps) {
   ].filter((thread) => thread !== null);
 
   return (
-    <div className="launch-detail-view detail-view">
+    <div className="detail-view">
       <div className="view-header">
         <BackButton onClick={popSidebarView} />
         <h2 className="view-title">Launch</h2>

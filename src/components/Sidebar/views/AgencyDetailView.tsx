@@ -1,7 +1,7 @@
 // src/components/Sidebar/views/AgencyDetailView.tsx
 import { useLaunchStore } from "../../../store/launchStore";
 import { Agency } from "../../../lib/api";
-import { getCountryFlag } from "../../../lib/utils";
+import { getCountryLabel } from "../../../lib/utils";
 import { useEntityLaunches } from "../../../hooks/useEntityLaunches";
 import { LaunchSection } from "./LaunchSection";
 import { BackButton } from "../../common/BackButton";
@@ -30,10 +30,7 @@ export function AgencyDetailView({ agency }: AgencyDetailViewProps) {
   const facts = [
     agency.type ? { k: "Type", v: agency.type } : null,
     agency.country_code
-      ? {
-          k: "Country",
-          v: `${getCountryFlag(agency.country_code)}  ${agency.country_code}`,
-        }
+      ? { k: "Country", v: getCountryLabel(agency.country_code) }
       : null,
     agency.founding_year
       ? { k: "Founded", v: String(agency.founding_year) }
@@ -45,7 +42,7 @@ export function AgencyDetailView({ agency }: AgencyDetailViewProps) {
   ].filter((fact): fact is { k: string; v: string } => fact !== null);
 
   return (
-    <div className="agency-detail-view detail-view">
+    <div className="detail-view">
       <div className="view-header">
         <BackButton onClick={popSidebarView} />
         <h2 className="view-title">Agency</h2>

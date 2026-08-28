@@ -11,7 +11,7 @@ import {
 } from "../../../store/launchStore";
 import { usePaginatedList } from "../../../hooks/usePaginatedList";
 import { useDebouncedCallback } from "../../../hooks/useDebouncedCallback";
-import { getCountryFlag } from "../../../lib/utils";
+import { getCountryLabel } from "../../../lib/utils";
 import { SearchField } from "../../common/SearchField";
 import { LaunchCard } from "../cards/LaunchCard";
 import "./Tab.css";
@@ -115,7 +115,7 @@ export function LaunchTab() {
       .sort()
       .map((code) => ({
         value: code,
-        label: `${getCountryFlag(code)}  ${code}`,
+        label: getCountryLabel(code),
       }));
   }, [tabLaunches, padById]);
 

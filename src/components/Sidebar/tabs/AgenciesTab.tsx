@@ -2,7 +2,7 @@
 import { useMemo, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { useLaunchStore } from "../../../store/launchStore";
-import { getCountryFlag } from "../../../lib/utils";
+import { getCountryLabel } from "../../../lib/utils";
 import { usePaginatedList } from "../../../hooks/usePaginatedList";
 import { useEntityLaunchCounts } from "../../../hooks/useEntityLaunchCounts";
 import { useDebouncedCallback } from "../../../hooks/useDebouncedCallback";
@@ -174,7 +174,7 @@ export function AgenciesTab() {
                 <div className="agency-name">{agency.name}</div>
                 {agency.country_code && (
                   <span className="country-flag">
-                    {getCountryFlag(agency.country_code)}
+                    {getCountryLabel(agency.country_code)}
                   </span>
                 )}
               </div>

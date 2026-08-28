@@ -1,11 +1,10 @@
 // src/components/Sidebar/views/PadDetailView.tsx
 import { useLaunchStore } from "../../../store/launchStore";
 import { Pad } from "../../../lib/api";
-import { formatCoordinates, getCountryFlag } from "../../../lib/utils";
+import { formatCoordinates, getCountryLabel } from "../../../lib/utils";
 import { useEntityLaunches } from "../../../hooks/useEntityLaunches";
 import { LaunchSection } from "./LaunchSection";
 import { BackButton } from "../../common/BackButton";
-import { Icon } from "../../common/Icon";
 import "./View.css";
 
 interface PadDetailViewProps {
@@ -14,8 +13,6 @@ interface PadDetailViewProps {
 
 export function PadDetailView({ pad }: PadDetailViewProps) {
   const popSidebarView = useLaunchStore((state) => state.popSidebarView);
-  const navigateToAgency = useLaunchStore((state) => state.navigateToAgency);
-  const agencies = useLaunchStore((state) => state.agencies);
   const allLaunches = useLaunchStore((state) => state.launches);
 
   const { launches, upcomingLaunches, pastLaunches } = useEntityLaunches(
@@ -24,15 +21,10 @@ export function PadDetailView({ pad }: PadDetailViewProps) {
     "pad_id",
   );
 
-  const operator = agencies.find((a) => a.id === pad.agency_id);
-
   const facts = [
     { k: "Coordinates", v: formatCoordinates(pad.latitude, pad.longitude) },
     pad.country_code
-      ? {
-          k: "Country",
-          v: `${getCountryFlag(pad.country_code)}  ${pad.country_code}`,
-        }
+      ? { k: "Country", v: getCountryLabel(pad.country_code) }
       : null,
     // The feed's own lifetime total, which can exceed what the local copy
     // holds — worth showing precisely because the two can differ.
@@ -42,7 +34,7 @@ export function PadDetailView({ pad }: PadDetailViewProps) {
   ].filter((fact): fact is { k: string; v: string } => fact !== null);
 
   return (
-    <div className="pad-detail-view detail-view">
+    <div className="detail-view">
       <div className="view-header">
         <BackButton onClick={popSidebarView} />
         <h2 className="view-title">Launch pad</h2>
@@ -74,23 +66,6 @@ export function PadDetailView({ pad }: PadDetailViewProps) {
             </a>
           )}
         </section>
-
-        {operator && (
-          <button
-            type="button"
-            className="thread-card"
-            onClick={() => navigateToAgency(operator.id)}
-          >
-            <span className="thread-mono">
-              {(operator.abbrev || operator.name).slice(0, 2).toUpperCase()}
-            </span>
-            <span className="thread-body">
-              <span className="thread-kind">Operator</span>
-              <span className="thread-title">{operator.name}</span>
-            </span>
-            <Icon name="forward" size={16} className="thread-arrow" />
-          </button>
-        )}
 
         <div className="view-stats">
           <div className="view-stat">

@@ -196,8 +196,20 @@ async def health(db: Session = Depends(get_db)):
 
 def _spawn_sync_subprocess(run_id: str) -> None:
     """Run LL2 sync in a separate process so it cannot destabilize uvicorn's event loop (esp. Windows)."""
-    backend_dir = Path(__file__).resolve().parents[1]
-    cmd = [sys.executable, "-m", "app.workers.run_sync_once", run_id]
+    # cwd, not __file__: in a frozen build __file__ resolves inside PyInstaller's
+    # onefile temp extraction dir, not the real backend directory. Rust already
+    # guarantees this process's own cwd is the real backend dir (cmd.current_dir
+    # in lib.rs, for both dev and release), so trust that instead - same fix
+    # already applied to the seed DB path for the same reason.
+    backend_dir = Path.cwd()
+    if getattr(sys, "frozen", False):
+        # In a packaged build, sys.executable is run_backend.exe itself, not a
+        # real python.exe - PyInstaller onefile builds don't support `-m
+        # module`. Re-invoke the same frozen exe with a flag it dispatches on
+        # instead (see run_backend.py) rather than shipping a second exe.
+        cmd = [sys.executable, "--sync-once", run_id]
+    else:
+        cmd = [sys.executable, "-m", "app.workers.run_sync_once", run_id]
     popen_kwargs: dict = {
         "args": cmd,
         "cwd": str(backend_dir),

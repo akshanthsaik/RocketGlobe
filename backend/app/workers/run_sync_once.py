@@ -22,7 +22,12 @@ logger = logging.getLogger(__name__)
 
 def _configure_logging(run_id: str) -> None:
     """Always log to backend/logs/sync-<run_id>.log; mirror to stderr if it is a TTY."""
-    log_dir = Path(__file__).resolve().parents[2] / "logs"
+    # cwd, not __file__: in a frozen build this module's __file__ resolves inside
+    # PyInstaller's onefile temp extraction dir, which is deleted when the
+    # process exits - the log would be written somewhere that vanishes
+    # immediately. _spawn_sync_subprocess sets this process's cwd to the real
+    # backend dir explicitly, so trust that instead.
+    log_dir = Path.cwd() / "logs"
     log_dir.mkdir(parents=True, exist_ok=True)
     log_path = log_dir / f"sync-{run_id}.log"
 

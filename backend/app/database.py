@@ -7,7 +7,12 @@ from sqlalchemy.orm import sessionmaker
 from app.config import settings
 from app.models.base import Base
 
-_SEED_DB_PATH = Path(__file__).resolve().parents[1] / "seed_data" / "rocketglobe_seed.db"
+# Resolved against the process's working directory, not __file__: __file__
+# doesn't point anywhere useful for locating a bundled sibling file inside a
+# frozen PyInstaller exe (run_backend.exe), whereas the working directory is
+# reliably set correctly in both dev and a packaged release - see
+# spawn_backend()'s cmd.current_dir(&backend_dir) in src-tauri/src/lib.rs.
+_SEED_DB_PATH = Path("seed_data/rocketglobe_seed.db")
 
 
 def seed_if_missing() -> None:

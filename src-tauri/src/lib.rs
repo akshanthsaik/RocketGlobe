@@ -75,8 +75,13 @@ fn resolve_backend_dir(app: &AppHandle) -> Result<PathBuf, String> {
         return Ok(cwd.join("backend"));
     }
 
+    // tauri.conf.json declares the resource as "resources/backend/run_backend.exe"
+    // (relative to src-tauri/), and Tauri preserves that structure under the
+    // resolved resource root - so the installed path keeps the "resources/"
+    // segment too. Debug mode never exercises this: it resolves the backend
+    // dir straight from the repo's own backend/ folder instead.
     app.path()
-        .resolve("backend", BaseDirectory::Resource)
+        .resolve("resources/backend", BaseDirectory::Resource)
         .map_err(|e| e.to_string())
 }
 
@@ -178,6 +183,21 @@ fn spawn_backend(app: &AppHandle) -> Result<Option<Child>, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Must be the first plugin registered. Without this, launching the
+        // app a second time (e.g. an impatient double-click while the first
+        // instance's backend is still cold-starting) spawns a second whole
+        // app - including a second backend child process racing the first
+        // for port 8000. The loser fails to bind and the app it belongs to
+        // shows "the local database did not answer", which looks like a
+        // real crash but is actually just two copies fighting over one
+        // port. This makes a second launch attempt focus the existing
+        // window instead of spawning anything new.
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.unminimize();
+                let _ = window.set_focus();
+            }
+        }))
         .manage(BackendState::default())
         .setup(|app| {
             if env_flag("ROCKETGLOBE_DISABLE_BACKEND") {

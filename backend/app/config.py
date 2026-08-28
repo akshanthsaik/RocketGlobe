@@ -27,6 +27,14 @@ class Settings(BaseSettings):
 
     class Config:
         env_file = ".env"
+        # A backend Settings class must not hard-crash over a variable it
+        # doesn't recognize. env_file is a bare relative path resolved
+        # against whatever the process's working directory happens to be -
+        # e.g. the packaged app's spawned run_backend.exe can end up reading
+        # an unrelated .env (or inherited environment) that includes the
+        # frontend's VITE_* build-time vars, and pydantic-settings rejects
+        # unknown keys by default instead of ignoring them.
+        extra = "ignore"
 
 
 settings = Settings()

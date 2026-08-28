@@ -135,10 +135,19 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:1420",
+        "http://127.0.0.1:1420",
+        # Packaged builds' webview origin. Tauri v1 (and non-Windows v2) used
+        # "tauri://localhost" - Windows Tauri v2 actually sends
+        # "http://tauri.localhost", a different string, which was never in
+        # this list. Requests still reached the backend and got a real 200,
+        # but the browser withheld the response from JS with no
+        # Access-Control-Allow-Origin header to permit it - this is why
+        # `tauri dev` (Vite's own origin, already allowlisted below) always
+        # worked while every packaged build failed with "Failed to fetch".
+        "http://tauri.localhost",
         "tauri://localhost",
         "http://localhost:5173",
         "http://localhost:3000",
-        "http://127.0.0.1:1420",
         "http://127.0.0.1:5173",
     ],
     allow_credentials=True,

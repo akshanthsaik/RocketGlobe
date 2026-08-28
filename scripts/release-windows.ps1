@@ -92,6 +92,9 @@ if (-not $SkipTypeCheck) {
     bun run check
 }
 
+Write-Step "Building backend executable"
+& (Join-Path $backendRoot "tools\build_backend_exe.ps1") -Force
+
 Write-Step "Building Tauri bundle"
 bun run tauri build
 Pop-Location

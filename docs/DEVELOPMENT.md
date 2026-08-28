@@ -306,12 +306,15 @@ Environment variables override code defaults. Confirm effective values from back
 | `SQL_ECHO`                             | `False`                             | SQLAlchemy SQL echo                                                |
 | `API_HOST`                             | `127.0.0.1`                         | Host uvicorn binds to (`run_backend.py` and `python app/main.py`)  |
 | `API_PORT`                             | `8000`                              | Port uvicorn binds to (`run_backend.py` and `python app/main.py`)  |
+| `ADMIN_TOKEN`                          | `""`                                 | If set, required as `X-Admin-Token` on every `/admin/*` request (loopback-only regardless) |
+| `SYNC_SUBPROCESS_INHERIT_STDERR`       | `False`                             | Dev convenience: `true` shows the sync subprocess's stderr in the uvicorn terminal instead of only the log file |
 
 **Frontend env vars**
 
 | Variable            | Default                     | Purpose                |
 | ------------------- | --------------------------- | ---------------------- |
 | `VITE_API_BASE_URL` | `http://127.0.0.1:8000/api` | Base URL for API calls |
+| `VITE_ADMIN_TOKEN`  | unset                       | Sent as `X-Admin-Token` on admin calls via `adminFetch` (`src/lib/api.ts`); must match the backend's `ADMIN_TOKEN`. Vite auto-loads this into the frontend bundle from `.env`, but `src-tauri` (Rust) does not parse `.env` files — to also apply it to the dev-spawned backend, export `VITE_ADMIN_TOKEN` in your shell before `bun run tauri dev`, not just in this file. |
 
 The globe renders without imagery tiles — a flat ground with country outlines
 drawn from GeoJSON — so no Cesium Ion token is required and the globe works

@@ -356,6 +356,12 @@ export function Globe() {
 
         viewer = new Cesium.Viewer(containerRef.current, {
           terrainProvider,
+          // Without this, Cesium's Viewer constructor kicks off a network
+          // request for its default Ion base imagery layer (Cesium World
+          // Imagery) before the removeAll() below ever runs - that request
+          // has no token this app registers, so it just fails loudly in the
+          // console for no benefit. false skips creating that layer at all.
+          baseLayer: false,
           baseLayerPicker: false,
           geocoder: false,
           // Cesium's own toolbar is disabled entirely: it anchors top-right,
@@ -392,7 +398,6 @@ export function Globe() {
 
         // No imagery layers at all — the globe is a flat ground with country
         // outlines drawn over it. Nothing here touches the network.
-        viewer.imageryLayers.removeAll();
         viewer.scene.globe.baseColor = GLOBE_BASE_COLOR;
 
         viewer.scene.globe.enableLighting = false;

@@ -15,8 +15,9 @@ from sqlalchemy.orm import Session
 
 from app.api import api_router
 from app.config import settings
-from app.database import SessionLocal, get_db, init_db
+from app.database import SessionLocal, get_db, init_db, seed_if_missing
 from app.services.sync_run import (
+    RATE_LIMIT_SANITY_CEILING_SECONDS,
     create_sync_run,
     fail_sync_run,
     get_active_sync_run,
@@ -85,6 +86,7 @@ def _require_admin_access(
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    seed_if_missing()
     init_db()
 
     startup_db = SessionLocal()
@@ -342,10 +344,10 @@ async def get_sync_status(
                         seconds = int(float(value))
                     except (TypeError, ValueError):
                         continue
-                    if resource_name == "launches":
-                        seconds = min(seconds, settings.LL2_LAUNCHES_MAX_WAIT_SECONDS)
-                    else:
-                        seconds = min(seconds, settings.LL2_MAX_WAIT_SECONDS)
+                    # Sanity ceiling only, not the LL2 client's fail-fast cap:
+                    # the real reported wait can legitimately exceed it and
+                    # must reach callers uncapped (see sync_run.py).
+                    seconds = min(seconds, RATE_LIMIT_SANITY_CEILING_SECONDS)
                     if seconds > 0:
                         rate_limited_resources[str(resource_name)] = seconds
             if rate_limited_resources:
@@ -507,8 +509,8 @@ if __name__ == "__main__":
 
     uvicorn.run(
         "app.main:app",
-        host="0.0.0.0",
-        port=8000,
+        host=settings.API_HOST,
+        port=settings.API_PORT,
         reload=True,
         log_level="info",
     )

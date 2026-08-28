@@ -860,11 +860,11 @@ async def sync_all(db: Session, run_id: Optional[str] = None) -> dict:
                     raise
 
                 skipped_resources.append(f"{resource_name}:rate_limited")
-                bounded_wait = min(
-                    rate_limit_error.wait_seconds,
-                    float(rate_limit_error.max_wait_seconds),
-                )
-                rate_limited_resources[resource_name] = int(max(1, round(bounded_wait)))
+                # Store the real LL2-reported wait, not max_wait_seconds: that
+                # cap only decided *whether* to fail fast on this request, it
+                # is not how long callers should actually wait before the next
+                # sync attempt has a chance of succeeding.
+                rate_limited_resources[resource_name] = int(max(1, round(rate_limit_error.wait_seconds)))
                 logger.warning(
                     "Skipping %s due LL2 rate limit window %.1fs (max allowed %ss)",
                     resource_name,

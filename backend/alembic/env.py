@@ -1,21 +1,27 @@
-from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
-from alembic import context
 import sys
+from logging.config import fileConfig
 from pathlib import Path
+
+from sqlalchemy import engine_from_config, pool
+
+from alembic import context
 
 # Add parent directory to path (so app.* imports work)
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.models.base import Base
-from app.models import Launch, Pad, Agency, Rocket
 from app.config import settings
+from app.database import seed_if_missing
+from app.models.base import Base
 
 # Alembic Config object
 config = context.config
 
 # Use DATABASE_URL from settings instead of alembic.ini
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+
+# If this is a fresh install (no db file yet), start from the committed
+# offline snapshot instead of migrating an empty schema from scratch.
+seed_if_missing()
 
 # Logging
 if config.config_file_name is not None:
@@ -37,6 +43,7 @@ def run_migrations_offline() -> None:
     with context.begin_transaction():
         context.run_migrations()
 
+
 def run_migrations_online() -> None:
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
@@ -55,6 +62,7 @@ def run_migrations_online() -> None:
 
         with context.begin_transaction():
             context.run_migrations()
+
 
 if context.is_offline_mode():
     run_migrations_offline()

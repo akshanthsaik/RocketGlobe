@@ -9,13 +9,19 @@ from typing import Any, Optional
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.config import settings
 from app.models import SyncRun, SyncState
 from app.utils.time import normalize_utc
 
 logger = logging.getLogger(__name__)
 
 RUNNING_STATUSES = ("queued", "running")
+
+# Guards a stored `_rate_limited` wait against a corrupt/garbage value only.
+# The real LL2-reported wait can legitimately exceed the LL2 client's
+# fail-fast cap (that cap governs how long a single request is retried before
+# giving up, not how long callers should wait before syncing again) and must
+# be reported to callers uncapped.
+RATE_LIMIT_SANITY_CEILING_SECONDS = 24 * 60 * 60
 
 
 def _utcnow() -> datetime:
@@ -284,11 +290,7 @@ def get_launch_rate_limit_cooldown_seconds(
     """
     now = _utcnow()
     recent_runs = (
-        db.query(SyncRun)
-        .filter(SyncRun.run_id != exclude_run_id)
-        .order_by(SyncRun.started_at.desc())
-        .limit(10)
-        .all()
+        db.query(SyncRun).filter(SyncRun.run_id != exclude_run_id).order_by(SyncRun.started_at.desc()).limit(10).all()
     )
 
     for run in recent_runs:
@@ -305,8 +307,7 @@ def get_launch_rate_limit_cooldown_seconds(
 
         if wait_seconds <= 0:
             continue
-        # Normalize legacy runs that may have stored very large server windows.
-        wait_seconds = min(wait_seconds, settings.LL2_LAUNCHES_MAX_WAIT_SECONDS)
+        wait_seconds = min(wait_seconds, RATE_LIMIT_SANITY_CEILING_SECONDS)
 
         baseline = normalize_utc(run.finished_at or run.updated_at or run.started_at)
         if baseline is None:

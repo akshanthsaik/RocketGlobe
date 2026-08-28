@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     LL2_EXISTING_DATA_LOOKBACK_HOURS: int = 24
     LL2_ALLOW_PARTIAL_SYNC_ON_RATE_LIMIT: bool = True
     SQL_ECHO: bool = False
-    API_HOST: str = "localhost"
+    API_HOST: str = "127.0.0.1"
     API_PORT: int = 8000
     ADMIN_TOKEN: str = ""
     SYNC_SUBPROCESS_INHERIT_STDERR: bool = False

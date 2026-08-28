@@ -20,6 +20,17 @@ function Write-Step {
     Write-Host "==> $Message" -ForegroundColor Cyan
 }
 
+# $ErrorActionPreference = "Stop" only catches PowerShell-level terminating
+# errors; it does not stop the script when a native command (bun, pip,
+# python) exits non-zero. Call this right after any such command so a real
+# build failure can't be silently swallowed and reported as success.
+function Assert-LastExitCode {
+    param([string]$Description)
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Description failed with exit code $LASTEXITCODE"
+    }
+}
+
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $backendRoot = Join-Path $repoRoot "backend"
 $venvPython = Join-Path $backendRoot "venv\Scripts\python.exe"
@@ -69,27 +80,33 @@ if (-not (Test-Path $venvPython)) {
     Write-Step "Creating backend virtualenv"
     Push-Location $backendRoot
     python -m venv venv
+    Assert-LastExitCode "python -m venv venv"
     Pop-Location
 }
 
 Write-Step "Installing backend dependencies"
 & $venvPython -m pip install --upgrade pip
+Assert-LastExitCode "pip install --upgrade pip"
 & $venvPython -m pip install -r (Join-Path $backendRoot "requirements.txt")
+Assert-LastExitCode "pip install -r requirements.txt"
 
 if (-not $SkipBackendMigrate) {
     Write-Step "Initializing backend schema"
     Push-Location $backendRoot
     & $venvPython -c "from app.database import init_db; init_db()"
+    Assert-LastExitCode "init_db()"
     Pop-Location
 }
 
 Write-Step "Installing frontend dependencies"
 Push-Location $repoRoot
 bun install --frozen-lockfile
+Assert-LastExitCode "bun install"
 
 if (-not $SkipTypeCheck) {
     Write-Step "Running TypeScript checks"
     bun run check
+    Assert-LastExitCode "bun run check"
 }
 
 Write-Step "Building backend executable"
@@ -97,6 +114,7 @@ Write-Step "Building backend executable"
 
 Write-Step "Building Tauri bundle"
 bun run tauri build
+Assert-LastExitCode "bun run tauri build"
 Pop-Location
 
 $bundleDir = Join-Path $repoRoot "src-tauri\target\release\bundle"

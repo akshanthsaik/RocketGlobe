@@ -1,0 +1,117 @@
+/* =========================================================
+   WELCOME SCREEN
+   First-run only, full takeover — unlike StartupNotice, which
+   floats over the chrome, this is the first thing a fresh
+   install shows, so it earns the whole viewport.
+   ========================================================= */
+.welcome-screen {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  background: var(--color-bg);
+  animation: fade-in var(--transition-slow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .welcome-screen {
+    animation: none;
+  }
+}
+
+.welcome-card {
+  width: min(480px, 100%);
+}
+
+.welcome-mark {
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--space-5);
+}
+
+.welcome-rule {
+  width: 28px;
+  height: 2px;
+  margin-bottom: var(--space-4);
+  background: var(--color-accent);
+}
+
+.welcome-kicker {
+  margin-bottom: var(--space-1-5);
+  font-size: var(--type-kicker);
+  letter-spacing: var(--kicker-tracking);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.welcome-title {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-heading);
+  font-weight: var(--weight-extrabold);
+  font-size: var(--type-display);
+  line-height: 1.1;
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-text);
+  text-wrap: balance;
+}
+
+.welcome-intro {
+  margin: 0 0 var(--space-6);
+  font-size: var(--type-body);
+  line-height: 1.55;
+  color: var(--color-text-3);
+}
+
+.welcome-features {
+  display: flex;
+  flex-direction: column;
+  margin: 0 0 var(--space-8);
+  padding: 0;
+  list-style: none;
+  border-top: var(--rule-section);
+}
+
+.welcome-feature {
+  padding: var(--space-3) 0;
+  border-bottom: var(--rule-row);
+}
+
+.welcome-feature-title {
+  margin-bottom: var(--space-1);
+  font-family: var(--font-heading);
+  font-weight: var(--weight-bold);
+  font-size: var(--type-row);
+  color: var(--color-text);
+}
+
+.welcome-feature-text {
+  font-size: var(--type-meta);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+}
+
+.welcome-cta {
+  padding: var(--space-2-5) var(--space-5);
+  background: var(--color-accent);
+  border: 2px solid var(--color-accent);
+  border-radius: 0;
+  color: var(--color-neutral-100);
+  font-family: var(--font-heading);
+  font-size: var(--type-meta);
+  font-weight: var(--weight-extrabold);
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.welcome-cta:hover {
+  background: var(--color-accent-600);
+}
+
+@media (max-width: 640px) {
+  .welcome-screen {
+    padding: var(--space-5);
+  }
+}

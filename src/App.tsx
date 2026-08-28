@@ -1,5 +1,5 @@
 // src/App.tsx
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { useLaunchStore } from "./store/launchStore";
 import { Header } from "./components/Layout/Header";
@@ -7,9 +7,33 @@ import { Sidebar } from "./components/Sidebar/Sidebar";
 import { Globe } from "./components/Globe/Globe";
 import { Timeline } from "./components/Timeline/Timeline";
 import { StartupNotice } from "./components/Layout/StartupNotice";
+import { WelcomeScreen } from "./components/Layout/WelcomeScreen";
 import "./App.css";
 
+const WELCOME_SEEN_KEY = "rocketglobe-welcome-seen";
+
+function hasSeenWelcome(): boolean {
+  try {
+    return localStorage.getItem(WELCOME_SEEN_KEY) === "1";
+  } catch {
+    // Storage can be unavailable (locked-down profile, private mode) - fail
+    // toward showing the app, not toward repeating the welcome screen.
+    return true;
+  }
+}
+
 function App() {
+  const [showWelcome, setShowWelcome] = useState(() => !hasSeenWelcome());
+
+  const dismissWelcome = () => {
+    try {
+      localStorage.setItem(WELCOME_SEEN_KEY, "1");
+    } catch {
+      // Nothing to persist to - it'll just show again next launch.
+    }
+    setShowWelcome(false);
+  };
+
   const fetchAllData = useLaunchStore((state) => state.fetchAllData);
   const isLoading = useLaunchStore((state) => state.isLoading);
   const error = useLaunchStore((state) => state.error);
@@ -31,7 +55,7 @@ function App() {
     <div className="app">
       <Header />
 
-      <div className="main-container">
+      <div className={`main-container${isColdStart ? "" : " content-ready"}`}>
         <Sidebar />
 
         {/* The globe and the timeline share a column: the timeline takes
@@ -45,11 +69,18 @@ function App() {
         </div>
       </div>
 
-      {/* The shell renders immediately either way — a desktop app reading a
-          local database starts cold, not slow, so a full-screen takeover
-          overstates the wait. Both notices sit over the chrome instead. */}
-      {(isColdStart || error) && (
-        <StartupNotice error={error} onRetry={fetchAllData} />
+      {/* A first run shows the welcome screen instead of the startup notice —
+          data loads silently behind it either way, so by the time "Get
+          started" is clicked there is usually nothing left to wait for. */}
+      {showWelcome ? (
+        <WelcomeScreen onDismiss={dismissWelcome} />
+      ) : (
+        /* The shell renders immediately either way — a desktop app reading a
+           local database starts cold, not slow, so a full-screen takeover
+           overstates the wait. Both notices sit over the chrome instead. */
+        (isColdStart || error) && (
+          <StartupNotice error={error} onRetry={fetchAllData} />
+        )
       )}
     </div>
   );

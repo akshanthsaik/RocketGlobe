@@ -34,12 +34,27 @@
 /* =========================================================
    WORKING AREA
    ========================================================= */
+/* Starts invisible and fades in once real content (not just the empty shell)
+   is ready to show - StartupNotice/WelcomeScreen sit outside this element
+   specifically so they stay visible immediately, unaffected by this. */
 .main-container {
   position: relative;
   display: flex;
   min-height: 0; /* critical for nested flex + overflow */
   overflow: hidden;
   background: var(--color-bg);
+  opacity: 0;
+}
+
+.main-container.content-ready {
+  opacity: 1;
+  animation: fade-in var(--transition-slow);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .main-container.content-ready {
+    animation: none;
+  }
 }
 
 /* Globe above, timeline below. The second row is `auto`, so it costs nothing

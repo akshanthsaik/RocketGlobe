@@ -55,7 +55,7 @@ export function StartupNotice({ error, onRetry }: StartupNoticeProps) {
       <h2 className="startup-title">Reading launch data</h2>
       {isSlow && (
         <p className="startup-text">
-          Taking longer than usual — waiting for the backend to come up.
+          Taking longer than usual, waiting for the backend to come up.
         </p>
       )}
     </div>

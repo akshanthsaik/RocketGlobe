@@ -179,7 +179,7 @@ export function RocketsTab() {
             <div className="empty-state-rule" />
             <div className="empty-state-title">No rockets match that</div>
             <div className="empty-state-text">
-              The whole database is already on this machine — this is a filter
+              The whole database is already on this machine; this is a filter
               result, not a loading state.
             </div>
           </div>

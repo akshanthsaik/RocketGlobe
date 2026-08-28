@@ -468,8 +468,7 @@ export function LaunchTab() {
             </div>
             <div className="empty-state-text">
               Every launch is already loaded on this machine, so nothing is
-              still arriving. Loosen a filter — or clear them all and start
-              over.
+              still arriving. Loosen a filter, or clear them all and start over.
             </div>
           </div>
         )}

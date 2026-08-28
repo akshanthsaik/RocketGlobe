@@ -18,7 +18,7 @@ export function SyncStrip({ run }: SyncStripProps) {
     run.message ??
     (queued
       ? "Waiting for the worker to pick this up."
-      : "This runs in the background — the app stays usable while it works.");
+      : "This runs in the background; the app stays usable while it works.");
 
   return (
     <div className="sync-strip" role="status" aria-live="polite">

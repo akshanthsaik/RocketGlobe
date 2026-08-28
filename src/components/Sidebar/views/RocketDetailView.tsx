@@ -149,9 +149,9 @@ export function RocketDetailView({ rocket }: RocketDetailViewProps) {
               </div>
             ))}
             <p className="view-note">
-              Bars share one scale — full width is{" "}
-              {formatNumber(REFERENCE_PAYLOAD_KG / 1000)} tonnes — so they can
-              be read across rockets, not just against each other.
+              Bars share one scale: full width is{" "}
+              {formatNumber(REFERENCE_PAYLOAD_KG / 1000)} tonnes, so they can be
+              read across rockets, not just against each other.
             </p>
           </section>
         )}

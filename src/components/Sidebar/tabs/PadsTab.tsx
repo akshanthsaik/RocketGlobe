@@ -130,7 +130,7 @@ export function PadsTab() {
             <div className="empty-state-rule" />
             <div className="empty-state-title">No pads match that</div>
             <div className="empty-state-text">
-              The whole database is already on this machine — this is a search
+              The whole database is already on this machine; this is a search
               result, not a loading state.
             </div>
           </div>

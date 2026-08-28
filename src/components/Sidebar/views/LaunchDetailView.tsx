@@ -42,7 +42,7 @@ export function LaunchDetailView({ launch }: LaunchDetailViewProps) {
   // one bound alone is worth stating plainly rather than as half a range.
   let windowNote: string | null = null;
   if (launch.window_start && launch.window_end) {
-    windowNote = `Window ${formatDate(launch.window_start)} — ${formatDate(
+    windowNote = `Window ${formatDate(launch.window_start)} to ${formatDate(
       launch.window_end,
     )}`;
   } else if (launch.window_start) {
@@ -116,7 +116,7 @@ export function LaunchDetailView({ launch }: LaunchDetailViewProps) {
         {/* "NET" is the feed's term and means nothing to most readers, so the
             label spells it out and the date gets the emphasis. */}
         <div className="net-block">
-          <div className="net-kicker">Scheduled — no earlier than</div>
+          <div className="net-kicker">Scheduled: no earlier than</div>
           <div className="net-stamp">{formatDate(launch.net)}</div>
           {windowNote && <div className="net-note">{windowNote}</div>}
         </div>

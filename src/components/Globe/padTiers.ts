@@ -18,7 +18,7 @@ export const PAD_TIERS = [
   { min: 0, label: "Never flown", fill: null, size: 8 },
 ] as const;
 
-export type PadTier = (typeof PAD_TIERS)[number];
+type PadTier = (typeof PAD_TIERS)[number];
 
 export function tierFor(launchCount: number): PadTier {
   return (

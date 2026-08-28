@@ -1,9 +1,9 @@
 // src/components/Layout/syncStages.ts
 import { SYNC_STAGES, type SyncRun, type SyncStage } from "../../lib/api";
 
-export type StageState = "done" | "active" | "pending" | "skipped" | "blocked";
+type StageState = "done" | "active" | "pending" | "skipped" | "blocked";
 
-export interface Stage {
+interface Stage {
   name: SyncStage;
   label: string;
   state: StageState;

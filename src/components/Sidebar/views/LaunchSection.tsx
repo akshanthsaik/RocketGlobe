@@ -40,7 +40,7 @@ export function LaunchSection({ title, launches }: LaunchSectionProps) {
         <span className="view-section-count">{launches.length}</span>
       </div>
 
-      <div className="view-section-list">
+      <div>
         {visibleItems.map((launch) => (
           <LaunchCard
             key={launch.id}

@@ -19,6 +19,7 @@ backend/.env
 
 # IDE
 .vscode/
+.vs/
 .idea/
 *.swp
 *.swo
@@ -69,3 +70,6 @@ public/cesium/
 
 # Keep the seed snapshot (needed to run offline; exempt from *.db above)
 !backend/seed_data/rocketglobe_seed.db
+
+# AI-assistant instructions - local dev aid only, not part of the public repo
+CLAUDE.md

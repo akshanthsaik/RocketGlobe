@@ -79,7 +79,7 @@ export function RocketDetailView({ rocket }: RocketDetailViewProps) {
   const lineage = [rocket.family, rocket.variant].filter(Boolean).join(" · ");
 
   return (
-    <div className="rocket-detail-view detail-view">
+    <div className="detail-view">
       <div className="view-header">
         <BackButton onClick={popSidebarView} />
         <h2 className="view-title">Rocket</h2>

@@ -15,6 +15,20 @@ Grab the latest installer from the [Releases page](../../releases/latest). Windo
 - **Timeline**: scrub or auto-play through launch history, camera following along.
 - **Background sync**: pulls new launches from Launch Library 2 in the background.
 
+## Screenshots
+
+![Globe view, Launches mode](docs/screenshots/globe-launches.png)
+Globe view: pads plotted by launch activity, filters and upcoming/decided/previous counts in the sidebar.
+
+![Launch detail with pad inset](docs/screenshots/launch-detail.png)
+Launch detail, with a pad-focus inset for the launch site.
+
+![Timeline scrub](docs/screenshots/timeline.png)
+Timeline: scrub or auto-play through launch history.
+
+![Agencies view, choropleth by launches](docs/screenshots/agencies.png)
+Agencies view: globe colored by launches per country, list sorted by launch count.
+
 ## Building from source
 
 See [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md).

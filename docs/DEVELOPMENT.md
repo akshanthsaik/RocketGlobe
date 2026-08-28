@@ -204,7 +204,7 @@ Run status values (`sync_runs.status`):
 
 **Seed snapshot (`backend/tools/build_seed_snapshot.py`)**
 
-LL2's anonymous tier (~15 requests/hour) can't sustain a fresh install's first full-history sync (confirmed with The Space Devs: crawling once and caching a snapshot is the expected pattern). This separate, deliberately patient tool builds that snapshot — run by hand, unattended, for as long as a full crawl takes:
+LL2's anonymous tier (~15 requests/hour) can't sustain a fresh install's first full-history sync (confirmed with The Space Devs: crawling once and caching a snapshot is the expected pattern). This separate, deliberately patient tool builds that snapshot (run by hand, unattended, for as long as a full crawl takes):
 
 ```bash
 cd backend
@@ -223,7 +223,7 @@ LL2 asked the client to wait longer than the configured maximum; with partial mo
 
 **Symptom: `POST /admin/sync` returns 409**
 
-A run is already active — use the returned `run_id` to poll `GET /admin/sync-status?run_id=...` instead of starting a new one.
+A run is already active; use the returned `run_id` to poll `GET /admin/sync-status?run_id=...` instead of starting a new one.
 
 ## Configuration
 
@@ -268,11 +268,11 @@ Environment variables override code defaults. Confirm effective values from back
 | `VITE_API_BASE_URL` | `http://127.0.0.1:8000/api` | Base URL for API calls |
 | `VITE_ADMIN_TOKEN`  | unset                       | Sent as `X-Admin-Token` on admin calls via `adminFetch` (`src/lib/api.ts`); must match the backend's `ADMIN_TOKEN`. |
 
-The globe renders without imagery tiles — a flat ground with country outlines
-drawn from GeoJSON — so no Cesium Ion token is required and the globe works
+The globe renders without imagery tiles: a flat ground with country outlines
+drawn from GeoJSON, so no Cesium Ion token is required and the globe works
 with no network.
 
-`VITE_ADMIN_TOKEN` only reaches the backend if the process spawning it sees the same variable: Vite bakes it into the frontend bundle from `.env`, but `src-tauri` doesn't parse `.env` files, so export it in your shell before `bun run tauri dev` (dev) or before launching the installed app (release) — `spawn_backend` in `lib.rs` forwards it as `ADMIN_TOKEN` identically in both modes. The release pipeline (`scripts/release-windows.ps1`) never sets it, so `ADMIN_TOKEN` protection is effectively dev-only unless done by hand.
+`VITE_ADMIN_TOKEN` only reaches the backend if the process spawning it sees the same variable: Vite bakes it into the frontend bundle from `.env`, but `src-tauri` doesn't parse `.env` files, so export it in your shell before `bun run tauri dev` (dev) or before launching the installed app (release); `spawn_backend` in `lib.rs` forwards it as `ADMIN_TOKEN` identically in both modes. The release pipeline (`scripts/release-windows.ps1`) never sets it, so `ADMIN_TOKEN` protection is effectively dev-only unless done by hand.
 
 **Tauri env vars**
 
@@ -290,7 +290,7 @@ with no network.
 - Rust toolchain (for Tauri)
 - Python 3.x (for backend dev/build tooling)
 
-No separate database server is required — the backend uses SQLite, a single local file.
+No separate database server is required: the backend uses SQLite, a single local file.
 
 **Database setup**
 
@@ -343,37 +343,27 @@ cd ..
 bun run tauri dev
 ```
 
-**CI** (`.github/workflows/ci.yml`)
-
-Three jobs run on every push/PR to `main`/`develop`:
-
-- `frontend` (Windows runner): `bun install`, `bun run check`, `bun run format:check`. The Tauri build itself is currently skipped in CI.
-- `backend` (Ubuntu runner): `ruff check .`, `ruff format --check .`, `alembic upgrade head`, `pytest tests/`.
-- `lint` (Ubuntu runner): checks that the latest commit message starts with a Conventional Commits type (`feat|fix|docs|style|refactor|test|chore|perf|ci|build|revert:`); non-blocking.
-
-`bun run lint` and `bun run test` are not run in CI — run them locally before considering frontend work done.
+**CI** (`.github/workflows/ci.yml`) runs `bun run check` + `format:check` for the frontend and `ruff check`/`ruff format --check`/`alembic upgrade head`/`pytest` for the backend on every push/PR to `main`/`develop`. `bun run lint` and `bun run test` are not run in CI; run them locally before considering frontend work done.
 
 ## Packaging Notes
 
 Current Tauri bundle resources are configured in `src-tauri/tauri.conf.json` (object form, so a resource can be pulled in from outside `src-tauri/`):
 
-- `resources/backend/run_backend.exe` — the PyInstaller-frozen backend, built by `backend/tools/build_backend_exe.ps1`.
-- `../backend/seed_data/rocketglobe_seed.db` → `resources/backend/seed_data/rocketglobe_seed.db` — the offline snapshot `seed_if_missing()` copies into place on a fresh install.
+- `resources/backend/run_backend.exe`: the PyInstaller-frozen backend, built by `backend/tools/build_backend_exe.ps1`.
+- `../backend/seed_data/rocketglobe_seed.db` → `resources/backend/seed_data/rocketglobe_seed.db`: the offline snapshot `seed_if_missing()` copies into place on a fresh install.
 
 Important behavior:
 
 - Debug build: Tauri starts backend via `backend/venv` Python + `uvicorn`. `DATABASE_URL` comes from `backend/.env`, defaulting to `sqlite:///./rocketglobe.db`.
-- Release build: Tauri starts bundled `run_backend.exe` with `DATABASE_URL` pointed at `<app_local_data_dir>/rocketglobe.db` (`resolve_release_database_url` in `lib.rs`), so each user's data persists across updates. `resolve_backend_dir()` resolves `resources/backend` under `BaseDirectory::Resource` in release — it must match the resource paths above exactly, or the app panics on launch with "Bundled backend executable not found".
-- `src-tauri/resources/` is gitignored, so those artifacts must exist locally before `tauri build` — `bun run release:windows` builds them (see Windows Release below); a bare `bun run tauri build` does not.
-- `tauri-plugin-single-instance` is registered first in the builder chain (`lib.rs`) — without it, a second launch during cold PyInstaller extraction spawns a second app + backend racing for port 8000, and the loser's failed bind looks like a real crash. A second launch now just focuses the existing window.
+- Release build: Tauri starts bundled `run_backend.exe` with `DATABASE_URL` pointed at `<app_local_data_dir>/rocketglobe.db` (`resolve_release_database_url` in `lib.rs`), so each user's data persists across updates. `resolve_backend_dir()` resolves `resources/backend` under `BaseDirectory::Resource` in release; it must match the resource paths above exactly, or the app panics on launch with "Bundled backend executable not found".
+- `src-tauri/resources/` is gitignored, so those artifacts must exist locally before `tauri build`: `bun run release:windows` builds them (see Windows Release below); a bare `bun run tauri build` does not.
+- `tauri-plugin-single-instance` is registered first in the builder chain (`lib.rs`); without it, a second launch during cold PyInstaller extraction spawns a second app + backend racing for port 8000, and the loser's failed bind looks like a real crash. A second launch now just focuses the existing window.
 
 ### CORS and CSP for the packaged webview
 
-Two separate browser mechanisms gate the packaged app's calls to its own local backend; get either wrong and the UI breaks with no server-side symptom to debug from.
-
-- **CORS** (`CORSMiddleware.allow_origins` in `backend/app/main.py`) must include `http://tauri.localhost` — the actual origin a packaged Tauri v2 app uses on Windows, distinct from both Vite's dev origin (why `tauri dev` never catches this) and the legacy v1 scheme `tauri://localhost` (easy to add by mistake). Miss it and requests still complete with a real `200` in the backend logs, but the browser withholds the response from JS — the frontend shows "Failed to fetch" with nothing in the network tab unless DevTools' console is open.
-- **CSP** (`app.security.csp` in `src-tauri/tauri.conf.json`) needs `'wasm-unsafe-eval'` **and** `blob:` in `script-src` — not just `worker-src` — for Cesium. Its geometry workers spawn fine under `worker-src 'self' blob:` alone, but each then loads its code via `importScripts()` on a `blob:` URL, which `script-src` governs. Miss `script-src blob:` and you get a working app with an invisible globe: pad markers render, country outlines don't. `devCsp`'s `'unsafe-eval'` masks this entirely in dev.
-- To debug either in a packaged build: launch the installed exe with `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222`, then attach to `http://127.0.0.1:9222/json` for a list of CDP targets and open a WebSocket to the main page's `webSocketDebuggerUrl`.
+- **CORS** (`CORSMiddleware.allow_origins` in `backend/app/main.py`) must include `http://tauri.localhost`, the real packaged Tauri v2 origin on Windows, not the old v1 scheme `tauri://localhost`.
+- **CSP** (`app.security.csp` in `src-tauri/tauri.conf.json`) needs `'wasm-unsafe-eval'` and `blob:` in `script-src` (not just `worker-src`) for Cesium's workers.
+- Debug either in a packaged build via WebView2 remote debugging: launch the installed exe with `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222`, then attach to `http://127.0.0.1:9222/json` for CDP targets.
 
 ## Windows Release
 
@@ -404,8 +394,8 @@ Output artifacts are placed under:
 
 - `src-tauri/target/release/bundle` (both `.msi` and NSIS `-setup.exe`)
 
-If only `src-tauri/` changed (no frontend or backend edits), `bun run tauri build` alone is enough — it re-runs `beforeBuildCommand` (`bun run build`) and re-bundles, but skips the backend venv/exe rebuild steps above.
+If only `src-tauri/` changed (no frontend or backend edits), `bun run tauri build` alone is enough: it re-runs `beforeBuildCommand` (`bun run build`) and re-bundles, but skips the backend venv/exe rebuild steps above.
 
-**GitHub Actions release workflow** (`.github/workflows/release.yml`): triggers on a `v*` tag push, runs the same `release-windows.ps1` pipeline on a Windows runner, then globs the `.msi`/`.exe` output and publishes a GitHub Release via `gh release create --generate-notes`. Never exercised by a real tag push — treat the first real release as this workflow's first real test.
+Pushing a `v*` tag runs this same pipeline on GitHub Actions (`.github/workflows/release.yml`) and publishes the resulting `.msi`/`.exe` to a GitHub Release.
 
 Target machines need no system Python (bundled `run_backend.exe`) and no database server (SQLite is a single file managed entirely by the app).

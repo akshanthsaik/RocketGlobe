@@ -1,5 +1,6 @@
 import os
 from datetime import datetime, timezone
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
@@ -41,7 +42,15 @@ def test_is_pid_alive_current_process():
 def test_trigger_sync_returns_202():
     _reset_active_sync_for_tests()
     client = TestClient(app)
-    resp = client.post("/admin/sync")
+    # _spawn_sync_subprocess actually launches `python -m app.workers.run_sync_once`,
+    # which hits the real LL2 API in the background. Without mocking it, this test
+    # is only deterministic until LL2's ~15 req/hour anonymous limit is hit by that
+    # real subprocess - after which every subsequent run gets a real 429 regardless
+    # of whether this endpoint's own logic is correct. Mocking it keeps the test
+    # scoped to what it actually verifies: the endpoint's lock/cooldown checks and
+    # response shape, not a live network call.
+    with patch("app.main._spawn_sync_subprocess"):
+        resp = client.post("/admin/sync")
     # Should schedule background job and return 202 Accepted
     assert resp.status_code == 202
     data = resp.json()

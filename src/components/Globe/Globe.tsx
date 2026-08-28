@@ -14,6 +14,7 @@ import { tierFor } from "./padTiers";
 import { GlobeStats } from "./GlobeStats";
 import { GlobeControls } from "./GlobeControls";
 import { PadInsetView } from "./PadInsetView";
+import { PadFocusCard } from "./PadFocusCard";
 import { normalizeCountryCode } from "../../lib/utils";
 import type { Agency, Launch, Pad } from "../../lib/api";
 import { useEntityLaunchCounts } from "../../hooks/useEntityLaunchCounts";
@@ -91,6 +92,47 @@ const DEFAULT_CAMERA_DESTINATION = Cesium.Cartesian3.fromDegrees(
   20000000,
 );
 
+/**
+ * A flat point-to-point flyTo reads as a slide, not a flight. These two
+ * options are Cesium's own arc controls — no manual multi-leg path needed:
+ * `pitchAdjustHeight` is the altitude above which the camera pitches to look
+ * further ahead instead of straight down, so the climb and descent actually
+ * look like a climb and descent; `maximumHeight` caps how high a flight is
+ * allowed to arc. Capped well under the full-overview altitude so a short
+ * pad-to-pad hop doesn't climb as dramatically as a cross-globe one.
+ */
+const FLYOVER_PITCH_ADJUST_HEIGHT = FOCUS_ALTITUDE_METRES;
+const FLYOVER_MAXIMUM_HEIGHT = 2_500_000;
+
+interface PadFocusTarget {
+  padName: string;
+  agencyName: string | null;
+}
+
+/**
+ * Shared by every "fly to a specific pad" call site (pad click, timeline
+ * camera-follow, selected-launch highlight) so the arc tuning and callbacks
+ * can't drift between them the way three independent flyTo calls did before.
+ */
+function flyToPadFocus(
+  viewer: Cesium.Viewer,
+  destination: Cesium.Cartesian3,
+  options?: {
+    duration?: number;
+    onComplete?: () => void;
+    onCancel?: () => void;
+  },
+) {
+  viewer.camera.flyTo({
+    destination,
+    duration: options?.duration ?? 2,
+    pitchAdjustHeight: FLYOVER_PITCH_ADJUST_HEIGHT,
+    maximumHeight: FLYOVER_MAXIMUM_HEIGHT,
+    complete: options?.onComplete,
+    cancel: options?.onCancel,
+  });
+}
+
 export function Globe() {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewerRef = useRef<Cesium.Viewer | null>(null);
@@ -104,6 +146,10 @@ export function Globe() {
 
   const [isReady, setIsReady] = useState(false);
   const [viewerReady, setViewerReady] = useState(false);
+  // Set for the duration of a pad-focus flyTo, cleared on complete/cancel.
+  // Drives the "Focusing" card and holds the pad inset back until the
+  // flight actually lands, so the two don't show at once.
+  const [focusTarget, setFocusTarget] = useState<PadFocusTarget | null>(null);
 
   // Store slices
   const pads = useLaunchStore((state) => state.pads);
@@ -120,8 +166,7 @@ export function Globe() {
 
   const globeMode = useLaunchStore((state) => state.globeMode);
   const isLoading = useLaunchStore((state) => state.isLoading);
-  const sidebarOpen = useLaunchStore((state) => state.sidebarOpen);
-  const showInset = Boolean(selectedLaunch && !isLoading && !isTimelinePlaying);
+  const showInset = Boolean(selectedLaunch && !isLoading && !focusTarget);
 
   const launchTab = useLaunchStore((s) => s.launchTab);
   const searchQuery = useLaunchStore((s) => s.searchQuery);
@@ -185,6 +230,14 @@ export function Globe() {
     });
     return map;
   }, [pads]);
+
+  const agencyById = useMemo(() => {
+    const map = new Map<number, (typeof agencies)[number]>();
+    agencies.forEach((agency) => {
+      map.set(agency.id, agency);
+    });
+    return map;
+  }, [agencies]);
 
   const launchesForPads = useMemo(() => {
     if (globeMode === "launches") {
@@ -283,6 +336,13 @@ export function Globe() {
   useEffect(() => {
     if (!isReady || !containerRef.current || viewerRef.current) return;
 
+    // StrictMode runs this effect, cleans it up, and reruns it immediately in
+    // dev to surface exactly this class of bug: initializeViewer is async, so
+    // the cleanup below can destroy `viewer` while a suspended `await` still
+    // holds a reference to it. Every await is followed by a `cancelled` check
+    // so a stale continuation stops instead of calling methods on (or
+    // reporting errors from) a viewer that cleanup already tore down.
+    let cancelled = false;
     let viewer: Cesium.Viewer | null = null;
     let handler: Cesium.ScreenSpaceEventHandler | null = null;
 
@@ -290,10 +350,9 @@ export function Globe() {
       try {
         if (!containerRef.current) throw new Error("Container lost");
 
-        // Use EllipsoidTerrainProvider for faster initial load
+        // EllipsoidTerrainProvider for faster initial load. Could upgrade to
+        // Cesium.createWorldTerrainAsync() later for real terrain visuals.
         const terrainProvider = new Cesium.EllipsoidTerrainProvider();
-        // Optionally upgrade to WorldTerrainAsync later for better visuals
-        // const terrainProvider = await Cesium.createWorldTerrainAsync();
 
         viewer = new Cesium.Viewer(containerRef.current, {
           terrainProvider,
@@ -316,13 +375,17 @@ export function Globe() {
           requestRenderMode: true,
           maximumRenderTimeChange: Infinity,
         });
+        if (cancelled) return;
 
         const padsSource = new Cesium.CustomDataSource("pads");
         const agenciesSource = new Cesium.CustomDataSource("agencies");
         const overlaySource = new Cesium.CustomDataSource("overlay");
         await viewer.dataSources.add(padsSource);
+        if (cancelled) return;
         await viewer.dataSources.add(agenciesSource);
+        if (cancelled) return;
         await viewer.dataSources.add(overlaySource);
+        if (cancelled) return;
         padsDataSourceRef.current = padsSource;
         agenciesDataSourceRef.current = agenciesSource;
         overlayDataSourceRef.current = overlaySource;
@@ -364,6 +427,7 @@ export function Globe() {
               markerColor: Cesium.Color.TRANSPARENT,
             },
           );
+          if (cancelled) return;
           // Process each entity safely
           countries.entities.values.forEach((entity) => {
             // Only process if it's actually a polygon
@@ -380,6 +444,16 @@ export function Globe() {
                 entity.polygon.height = new Cesium.ConstantProperty(
                   OUTLINE_HEIGHT_METRES,
                 );
+                // GeoJsonDataSource defaults polygons to arcType RHUMB. Rhumb
+                // subdivision measures the wraparound edge of an antimeridian-
+                // crossing country (Russia, Fiji, the US via the Aleutians) as
+                // ~360deg wide instead of the true short distance, so its
+                // bisection loop never converges and crashes a Cesium worker
+                // with "Too many properties to enumerate". Geodesic doesn't
+                // have that pathology.
+                entity.polygon.arcType = new Cesium.ConstantProperty(
+                  Cesium.ArcType.GEODESIC,
+                );
                 // No extrudedHeight: a polygon extruded to its own height is
                 // a zero-volume solid, and it is not wanted here anyway.
                 entity.polygon.extrudedHeight = undefined;
@@ -390,6 +464,7 @@ export function Globe() {
           });
 
           await viewer.dataSources.add(countries);
+          if (cancelled) return;
           countriesRef.current = countries;
         } catch (error) {
           console.error(
@@ -423,14 +498,29 @@ export function Globe() {
                   if (position) {
                     const cartographic =
                       Cesium.Cartographic.fromCartesian(position);
-                    clickViewer.camera.flyTo({
-                      destination: Cesium.Cartesian3.fromRadians(
+                    const pad = useLaunchStore
+                      .getState()
+                      .pads.find((p) => p.id === padId);
+                    // No launch is in context for a bare pad click, and
+                    // Pad has no agency_id of its own (LL2 never sends one -
+                    // a pad's operator is only known through its launches),
+                    // so this path can't show an agency line.
+                    setFocusTarget({
+                      padName: pad?.name ?? "Launch pad",
+                      agencyName: null,
+                    });
+                    flyToPadFocus(
+                      clickViewer,
+                      Cesium.Cartesian3.fromRadians(
                         cartographic.longitude,
                         cartographic.latitude,
                         FOCUS_ALTITUDE_METRES,
                       ),
-                      duration: 2,
-                    });
+                      {
+                        onComplete: () => setFocusTarget(null),
+                        onCancel: () => setFocusTarget(null),
+                      },
+                    );
                   }
                 }
               } else if (entityType === "agency") {
@@ -438,27 +528,28 @@ export function Globe() {
                 if (agencyId) {
                   useLaunchStore.getState().navigateToAgency(agencyId);
                 }
-              } else if (entity.properties?.agencyCount) {
-                // Clicked on a country with agencies
-                // Optional: You can add a toast notification or sidebar update here
               }
             }
           },
           Cesium.ScreenSpaceEventType.LEFT_CLICK,
         );
 
+        if (cancelled) return;
         viewerRef.current = viewer;
         handlerRef.current = handler;
         setViewerReady(true);
       } catch (error) {
-        console.error("Failed to initialize Cesium viewer", error);
-        setIsReady(false);
+        if (!cancelled) {
+          console.error("Failed to initialize Cesium viewer", error);
+          setIsReady(false);
+        }
       }
     };
 
     initializeViewer();
 
     return () => {
+      cancelled = true;
       if (handler && !handler.isDestroyed()) {
         handler.destroy();
         handlerRef.current = null;
@@ -478,9 +569,12 @@ export function Globe() {
   // Shared by the Reset view control and the mode-change effect below, so
   // both routes back to the overview behave identically.
   const resetView = useCallback(() => {
+    // No maximumHeight here (unlike flyToPadFocus): this flight's destination
+    // is already at the full overview altitude, well above that cap.
     viewerRef.current?.camera.flyTo({
       destination: DEFAULT_CAMERA_DESTINATION,
       duration: 1.5,
+      pitchAdjustHeight: FLYOVER_PITCH_ADJUST_HEIGHT,
     });
   }, []);
 
@@ -716,24 +810,36 @@ export function Globe() {
     if (cameraFlyToRef.current) return;
     cameraFlyToRef.current = true;
 
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(
+    // Pad itself carries no agency_id - the launch flown from it does.
+    const agency = latest.agency_id
+      ? agencyById.get(latest.agency_id)
+      : undefined;
+    setFocusTarget({ padName: pad.name, agencyName: agency?.name ?? null });
+
+    flyToPadFocus(
+      viewer,
+      Cesium.Cartesian3.fromDegrees(
         pad.longitude,
         pad.latitude,
         FOCUS_ALTITUDE_METRES,
       ),
-      duration: 1.5,
-      complete: () => {
-        cameraFlyToRef.current = false;
+      {
+        duration: 1.5,
+        onComplete: () => {
+          cameraFlyToRef.current = false;
+          setFocusTarget(null);
+        },
+        onCancel: () => {
+          cameraFlyToRef.current = false;
+          setFocusTarget(null);
+        },
       },
-      cancel: () => {
-        cameraFlyToRef.current = false;
-      },
-    });
+    );
   }, [
     timelineDate,
     timelineEnabled,
     isTimelinePlaying,
+    agencyById,
     globeMode,
     padById,
     timelineLaunchesForGlobe,
@@ -781,35 +887,40 @@ export function Globe() {
     });
   }, [selectedRocket, globeMode, pads, launches]);
 
-  // Highlight selected launch (manual click). Skipped during timeline
-  // auto-play - playTimeline() also sets selectedLaunch on every step, and
-  // without this guard that raced with the camera-follow effect above,
-  // starting a new 2s flyTo before the previous one finished on every tick
-  // (constant blur at higher timeline speeds).
+  // Highlight selected launch. playTimeline()'s auto-advance also sets
+  // selectedLaunch on every step, so this is what flies the camera during
+  // playback too - the camera-follow effect above still skips auto-play
+  // (its own timelineDate trigger would otherwise fire a second, competing
+  // flyTo for the same destination on every step).
   useEffect(() => {
-    if (!viewerRef.current || !selectedLaunch?.pad_id || isTimelinePlaying)
-      return;
+    if (!viewerRef.current || !selectedLaunch?.pad_id) return;
 
     const viewer = viewerRef.current;
     const pad = padById.get(selectedLaunch.pad_id);
     if (!pad) return;
 
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(
+    // Pad itself carries no agency_id - the launch flown from it does.
+    const agency = selectedLaunch.agency_id
+      ? agencyById.get(selectedLaunch.agency_id)
+      : undefined;
+    setFocusTarget({ padName: pad.name, agencyName: agency?.name ?? null });
+
+    flyToPadFocus(
+      viewer,
+      Cesium.Cartesian3.fromDegrees(
         pad.longitude,
         pad.latitude,
         FOCUS_ALTITUDE_METRES,
       ),
-      duration: 2,
-    });
-  }, [selectedLaunch, padById, isTimelinePlaying]);
+      {
+        onComplete: () => setFocusTarget(null),
+        onCancel: () => setFocusTarget(null),
+      },
+    );
+  }, [selectedLaunch, padById, agencyById]);
 
   return (
-    <div
-      className={`globe-container ${!sidebarOpen ? "sidebar-closed" : ""} ${
-        showInset ? "has-inset" : ""
-      }`}
-    >
+    <div className="globe-container">
       <div ref={containerRef} className="cesium-viewer" />
       <div className="globe-overlays">
         <GlobeStats />
@@ -817,8 +928,17 @@ export function Globe() {
 
         <Legend mode={globeMode} />
 
-        {/* Close-up card for the selected launch's pad. Hidden during timeline
-            auto-play, where the selection changes every few seconds. */}
+        {/* While a pad-focus flight is in the air, shown in place of the
+            inset it hands off to on arrival (see showInset above). */}
+        {focusTarget && (
+          <PadFocusCard
+            padName={focusTarget.padName}
+            agencyName={focusTarget.agencyName}
+          />
+        )}
+
+        {/* Close-up card for the selected launch's pad, including during
+            timeline playback - selectedLaunch updates on every step. */}
         {showInset && (
           <PadInsetView
             pad={

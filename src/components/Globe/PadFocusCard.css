@@ -1,0 +1,53 @@
+/* =========================================================
+   PAD FOCUS CARD
+   Same bottom-right slot PadInsetView takes over once the
+   flight lands — see the note in PadFocusCard.tsx.
+   ========================================================= */
+.pad-focus-card {
+  position: absolute;
+  right: var(--overlay-gutter);
+  bottom: var(--overlay-gutter);
+  width: var(--inset-width);
+  padding: 10px 12px;
+  background: var(--color-bg);
+  border: 2px solid var(--color-neutral-800);
+  pointer-events: none;
+  z-index: var(--z-dropdown);
+  animation: fade-in var(--transition-fast);
+}
+
+.pad-focus-kicker {
+  font-size: var(--type-kicker);
+  letter-spacing: var(--kicker-tracking);
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.pad-focus-name {
+  margin-top: 1px;
+  font-family: var(--font-heading);
+  font-weight: var(--weight-extrabold);
+  font-size: var(--type-meta);
+  letter-spacing: -0.01em;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pad-focus-agency {
+  margin-top: 2px;
+  font-size: var(--type-micro);
+  color: var(--color-text-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 767px) {
+  .pad-focus-card {
+    right: var(--space-3);
+    bottom: var(--space-3);
+    width: 188px;
+  }
+}

@@ -12,11 +12,67 @@ use tauri::{AppHandle, Manager};
 #[cfg(debug_assertions)]
 use std::path::Path;
 
-#[cfg(all(target_os = "windows", not(debug_assertions)))]
+#[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
-#[cfg(all(target_os = "windows", not(debug_assertions)))]
+#[cfg(target_os = "windows")]
 const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+/// Assigns `child` to a new Windows Job Object with
+/// JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE. This makes the OS itself force-kill
+/// the backend (and anything it spawns - notably PyInstaller's onefile
+/// bootloader, which re-execs as a separate child process the backend
+/// `Child` handle knows nothing about) the moment this app process's handles
+/// are torn down, regardless of *how* that happens: normal exit, a crash, or
+/// being killed from Task Manager. The `on_window_event` handler below also
+/// explicitly taskkills the process tree on a graceful close, but that path
+/// only runs for a graceful close - this is the backstop for every other way
+/// the app can stop running, which a plain `Child::kill()` cannot cover
+/// since Windows does not cascade-kill children when a parent dies.
+///
+/// The created job handle is deliberately never closed on success: keeping
+/// it open for the app's entire lifetime is what makes kill-on-close work.
+/// It's reclaimed by the OS when this process exits, whichever way that
+/// happens.
+#[cfg(target_os = "windows")]
+fn assign_to_kill_on_close_job(child: &Child) {
+    use std::os::windows::io::AsRawHandle;
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::JobObjects::{
+        AssignProcessToJobObject, CreateJobObjectW, JobObjectExtendedLimitInformation,
+        SetInformationJobObject, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+        JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
+    };
+
+    unsafe {
+        let job = CreateJobObjectW(std::ptr::null(), std::ptr::null());
+        if job.is_null() {
+            eprintln!("rocketglobe: CreateJobObjectW failed; backend won't be force-killed if the app is killed abnormally");
+            return;
+        }
+
+        let mut info: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = std::mem::zeroed();
+        info.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+
+        let set_ok = SetInformationJobObject(
+            job,
+            JobObjectExtendedLimitInformation,
+            &info as *const _ as *const std::ffi::c_void,
+            std::mem::size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+        );
+        if set_ok == 0 {
+            eprintln!("rocketglobe: SetInformationJobObject failed; backend won't be force-killed if the app is killed abnormally");
+            CloseHandle(job);
+            return;
+        }
+
+        let process_handle = child.as_raw_handle() as windows_sys::Win32::Foundation::HANDLE;
+        if AssignProcessToJobObject(job, process_handle) == 0 {
+            eprintln!("rocketglobe: AssignProcessToJobObject failed; backend won't be force-killed if the app is killed abnormally");
+            CloseHandle(job);
+        }
+    }
+}
 
 #[tauri::command]
 fn greet(name: &str) -> String {
@@ -146,6 +202,8 @@ fn spawn_backend(app: &AppHandle) -> Result<Option<Child>, String> {
         }
 
         let child = cmd.spawn().map_err(|e| e.to_string())?;
+        #[cfg(target_os = "windows")]
+        assign_to_kill_on_close_job(&child);
         return Ok(Some(child));
     }
 
@@ -175,6 +233,8 @@ fn spawn_backend(app: &AppHandle) -> Result<Option<Child>, String> {
         cmd.creation_flags(CREATE_NO_WINDOW);
 
         let backend_child = cmd.spawn().map_err(|e| e.to_string())?;
+        #[cfg(target_os = "windows")]
+        assign_to_kill_on_close_job(&backend_child);
 
         return Ok(Some(backend_child));
     }
@@ -224,7 +284,25 @@ pub fn run() {
                 };
 
                 if let Some(mut backend) = backend_child {
-                    let _ = backend.kill();
+                    // On Windows, run_backend.exe is a PyInstaller onefile
+                    // bootloader: it extracts itself and re-execs as a
+                    // *separate child process*, which is the one actually
+                    // running uvicorn. backend.kill() only knows about the
+                    // bootloader's PID, so it leaves that real process
+                    // orphaned on port 8000 (and holding the exe file open,
+                    // which then breaks the next install/rebuild). Killing
+                    // the whole process tree via taskkill catches it.
+                    #[cfg(target_os = "windows")]
+                    {
+                        let _ = Command::new("taskkill")
+                            .args(["/T", "/F", "/PID", &backend.id().to_string()])
+                            .creation_flags(CREATE_NO_WINDOW)
+                            .output();
+                    }
+                    #[cfg(not(target_os = "windows"))]
+                    {
+                        let _ = backend.kill();
+                    }
                     let _ = backend.wait();
                 }
             }

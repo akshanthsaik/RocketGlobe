@@ -312,16 +312,10 @@ class LL2Client:
         self,
         limit: int = 10000,
         offset: int = 0,
-        net__gte: Optional[str] = None,
-        net__lte: Optional[str] = None,
         params: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Fetch launches from LL2. Additional `params` can be forwarded for filtering like `updated__gte`."""
         base = {"limit": limit, "offset": offset}
-        if net__gte:
-            base["net__gte"] = net__gte
-        if net__lte:
-            base["net__lte"] = net__lte
         if params:
             base.update(params)
         return await self._request("launches", params=base)

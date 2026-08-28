@@ -22,3 +22,10 @@ ignore = [
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.pytest.ini_options]
+# backend/tests has no __init__.py, so pytest's default import mode never adds
+# backend/ itself to sys.path - only the tests/ directory. Without this, `import
+# app.main` fails with "No module named 'app'" when pytest is invoked directly
+# (as opposed to `python -m pytest`, which prepends the cwd on its own).
+pythonpath = ["."]

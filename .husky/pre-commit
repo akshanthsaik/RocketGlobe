@@ -1,1 +1,40 @@
-bunx lint-staged
+bunx lint-staged || exit 1
+
+# lint-staged only auto-fixes files touched by *this* commit - it wouldn't have
+# caught a repo-wide format drift (e.g. line-ending changes from a previous
+# session) or a config bug pytest never exercises until CI invokes it fresh.
+# Mirror CI's actual gates here so neither class of failure reaches GitHub
+# again: full-repo Prettier check, tsc, and (if the backend venv exists)
+# ruff + pytest.
+echo ""
+echo "==> Running full CI-equivalent checks before commit..."
+
+bun run format:check || {
+  echo ""
+  echo "Prettier found formatting issues. Run 'bun run format' to fix, then re-commit."
+  exit 1
+}
+
+bun run check || exit 1
+
+if [ -f backend/venv/Scripts/ruff.exe ]; then
+  RUFF=venv/Scripts/ruff.exe
+  PYTEST=venv/Scripts/pytest.exe
+elif [ -f backend/venv/bin/ruff ]; then
+  RUFF=venv/bin/ruff
+  PYTEST=venv/bin/pytest
+else
+  RUFF=""
+fi
+
+if [ -n "$RUFF" ]; then
+  (cd backend && "$RUFF" check .) || exit 1
+  (cd backend && "$RUFF" format --check .) || {
+    echo ""
+    echo "Backend formatting issues found. Run 'venv/Scripts/ruff format .' in backend/, then re-commit."
+    exit 1
+  }
+  (cd backend && "$PYTEST" tests/) || exit 1
+else
+  echo "backend/venv not found - skipping ruff/pytest (run these yourself before pushing)."
+fi

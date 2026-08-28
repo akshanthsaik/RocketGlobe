@@ -1,0 +1,21 @@
+# Normalize all text files to LF in the repository, regardless of what a given
+# contributor's OS/editor/git config writes to their working directory. Without
+# this, Windows checkouts (e.g. GitHub Actions' windows-latest runner, which
+# defaults to core.autocrlf=true) convert LF -> CRLF on checkout, and Prettier
+# (which defaults to LF) then flags every one of those files as unformatted -
+# `bun run format:check` fails in CI on line endings alone, with no actual
+# content difference.
+* text=auto eol=lf
+
+# Windows-only files that genuinely want CRLF for that platform's tools.
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary assets: never touch line endings, never diff as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.icns binary
+*.woff2 binary
+*.db binary

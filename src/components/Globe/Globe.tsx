@@ -10,7 +10,7 @@ import {
 } from "../../store/launchStore";
 import "./Globe.css";
 import { Legend } from "./Legend";
-import { tierFor } from "./padTiers";
+import { tierFor, agencyCountryTierFor } from "./padTiers";
 import { GlobeStats } from "./GlobeStats";
 import { GlobeControls } from "./GlobeControls";
 import { PadInsetView } from "./PadInsetView";
@@ -59,11 +59,15 @@ function readCountryCode(entity: Cesium.Entity): string | null {
  */
 /**
  * With lighting off the globe is a flat fill, so it only reads as a sphere if
- * it is clearly lighter than the space behind it. These two must stay well
- * separated in value — when they were a step apart the Earth disappeared into
- * its own background.
+ * it is clearly lighter than the space behind it. These three must stay well
+ * separated in value — when land and space were a step apart the Earth
+ * disappeared into its own background; when water matched space exactly the
+ * sphere lost its silhouette and land looked like it was floating with
+ * nothing under it. Water sits one step above the void, land one step above
+ * water.
  */
 const GLOBE_BASE_COLOR = Cesium.Color.fromCssColorString("#33302e");
+const GLOBE_WATER_COLOR = Cesium.Color.fromCssColorString("#201e1d");
 const SPACE_COLOR = Cesium.Color.fromCssColorString("#14100f");
 const COUNTRY_STROKE = Cesium.Color.fromCssColorString("#8d8886");
 
@@ -74,6 +78,11 @@ const COUNTRY_STROKE = Cesium.Color.fromCssColorString("#8d8886");
  * grazing angles, so this trades just enough to stop the fighting.
  */
 const OUTLINE_HEIGHT_METRES = 3_000;
+// Pad/agency markers sit above the country outline's height, not at ground
+// level (0m) - otherwise the now-opaque country fill (previously
+// transparent, so this was never visible) physically occludes part of every
+// marker sprite, clipping a bite out of each dot depending on view angle.
+const MARKER_HEIGHT_METRES = 5_000;
 
 /**
  * With no imagery there is nothing to look at below roughly regional scale, so
@@ -83,6 +92,12 @@ const OUTLINE_HEIGHT_METRES = 3_000;
  */
 const MIN_ZOOM_METRES = 250_000;
 const FOCUS_ALTITUDE_METRES = 650_000;
+
+// Agency labels only render below this camera distance - see the comment on
+// entity.label in syncAgencies. Well past regional scale (a few thousand km,
+// like viewing a single continent) so labels have room; well short of the
+// 20,000km default overview, where all ~350 would overlap into mush.
+const AGENCY_LABEL_MAX_DISTANCE_METRES = 3_000_000;
 
 // Default overview camera position (used both on initial load and when
 // resetting the view on tab/mode switch).
@@ -123,14 +138,80 @@ function flyToPadFocus(
     onCancel?: () => void;
   },
 ) {
-  viewer.camera.flyTo({
-    destination,
-    duration: options?.duration ?? 2,
-    pitchAdjustHeight: FLYOVER_PITCH_ADJUST_HEIGHT,
-    maximumHeight: FLYOVER_MAXIMUM_HEIGHT,
-    complete: options?.onComplete,
-    cancel: options?.onCancel,
-  });
+  // A destination picked at a grazing viewing angle (near the globe's limb -
+  // the same geometry that makes markers clip there, see MARKER_HEIGHT_METRES)
+  // can come back with a non-finite component. Flying to one is what
+  // triggers CesiumJS's "normalized result is not a number" crash deep in its
+  // own tween math (a degenerate cross-product), which kills the whole
+  // renderer. Cheaper to refuse the flight than to rely solely on recovering
+  // from it after the fact (see the scene.renderError listener in
+  // initializeViewer, which is the backstop for whatever this doesn't catch).
+  const { x, y, z } = destination;
+  if (![x, y, z].every(Number.isFinite)) {
+    console.warn(
+      "flyToPadFocus: destination has non-finite component, skipping flight",
+      destination,
+    );
+    options?.onCancel?.();
+    return;
+  }
+
+  try {
+    viewer.camera.flyTo({
+      destination,
+      duration: options?.duration ?? 2,
+      pitchAdjustHeight: FLYOVER_PITCH_ADJUST_HEIGHT,
+      maximumHeight: FLYOVER_MAXIMUM_HEIGHT,
+      complete: options?.onComplete,
+      cancel: options?.onCancel,
+    });
+  } catch (error) {
+    console.error("flyToPadFocus: camera.flyTo threw synchronously", error);
+    options?.onCancel?.();
+  }
+}
+
+/**
+ * Pad/agency markers sit MARKER_HEIGHT_METRES above the surface, which is
+ * enough to clear the (also-raised) country outline polygon but not enough
+ * to clear the globe's own horizon at a grazing viewing angle - a marker
+ * can be geometrically behind the sphere's near-side bulge from the camera
+ * even while "elevated", and Cesium depth-tests point sprites against the
+ * globe per-pixel, so a marker straddling the horizon renders as a clipped
+ * semicircle rather than a full circle or nothing at all.
+ *
+ * Cesium's own horizon-culling utility (EllipsoidalOccluder) isn't part of
+ * the public API this package exports - Occluder is the public equivalent,
+ * built from a bounding sphere standing in for the globe. Toggling
+ * `entity.show` from a real visibility test (rather than trying to tune
+ * marker height indefinitely) is what actually fixes this: markers the
+ * occluder says are genuinely on the far side are hidden outright, so
+ * disabling depth test on the ones that remain shown (see the point
+ * graphics below) can no longer leak markers through the globe - only
+ * already-visible ones ever reach the GPU.
+ */
+function updateMarkerVisibility(
+  viewer: Cesium.Viewer,
+  dataSources: (Cesium.CustomDataSource | null)[],
+) {
+  const ellipsoid = viewer.scene.globe.ellipsoid;
+  const occluder = new Cesium.Occluder(
+    new Cesium.BoundingSphere(Cesium.Cartesian3.ZERO, ellipsoid.minimumRadius),
+    viewer.camera.positionWC,
+  );
+  const now = Cesium.JulianDate.now();
+
+  for (const dataSource of dataSources) {
+    if (!dataSource) continue;
+    for (const entity of dataSource.entities.values) {
+      const position = entity.position?.getValue(now);
+      if (!position) continue;
+      const visible = occluder.isPointVisible(position);
+      if (entity.show !== visible) {
+        entity.show = visible;
+      }
+    }
+  }
 }
 
 export function Globe() {
@@ -157,6 +238,7 @@ export function Globe() {
   const agencies = useLaunchStore((state) => state.agencies);
 
   const selectedLaunch = useLaunchStore((state) => state.selectedLaunch);
+  const selectedPad = useLaunchStore((state) => state.selectedPad);
   const selectedRocket = useLaunchStore((state) => state.selectedRocket);
   const selectedAgency = useLaunchStore((state) => state.selectedAgency);
 
@@ -166,7 +248,9 @@ export function Globe() {
 
   const globeMode = useLaunchStore((state) => state.globeMode);
   const isLoading = useLaunchStore((state) => state.isLoading);
-  const showInset = Boolean(selectedLaunch && !isLoading && !focusTarget);
+  const showInset = Boolean(
+    (selectedLaunch || selectedPad) && !isLoading && !focusTarget,
+  );
 
   const launchTab = useLaunchStore((s) => s.launchTab);
   const searchQuery = useLaunchStore((s) => s.searchQuery);
@@ -380,8 +464,30 @@ export function Globe() {
           // Performance optimizations
           requestRenderMode: true,
           maximumRenderTimeChange: Infinity,
+          // Cesium's own default error panel is disabled in favor of the
+          // renderError listener below, which resumes rendering instead of
+          // leaving the viewer permanently dead - see the comment there.
+          showRenderLoopErrors: false,
         });
         if (cancelled) return;
+
+        // A single bad camera.flyTo (e.g. a known CesiumJS edge case where an
+        // extreme-latitude destination combined with pitchAdjustHeight makes
+        // an internal cross-product degenerate - "normalized result is not a
+        // number") throws from inside Cesium's own per-frame tween update.
+        // Cesium's default behavior on any render-loop error is to set
+        // useDefaultRenderLoop to false and stop rendering entirely, which
+        // would otherwise kill the whole globe until the app is reloaded over
+        // one bad click. Resuming here trades "one flight animation glitches"
+        // for "the app stays alive" - the right trade for a single stray
+        // camera move.
+        viewer.scene.renderError.addEventListener((_scene, error) => {
+          console.error("Cesium render error, resuming render loop", error);
+          if (viewer) {
+            viewer.useDefaultRenderLoop = true;
+            viewer.scene.requestRender();
+          }
+        });
 
         const padsSource = new Cesium.CustomDataSource("pads");
         const agenciesSource = new Cesium.CustomDataSource("agencies");
@@ -396,9 +502,28 @@ export function Globe() {
         agenciesDataSourceRef.current = agenciesSource;
         overlayDataSourceRef.current = overlaySource;
 
+        // Re-run horizon visibility (see updateMarkerVisibility) whenever the
+        // camera moves enough to matter - camera.changed already debounces to
+        // "moved by a meaningful percentage", so this isn't a per-frame cost
+        // for what's only a few hundred cheap point-vs-sphere checks anyway.
+        viewer.camera.changed.addEventListener(() => {
+          if (viewer) {
+            updateMarkerVisibility(viewer, [
+              padsDataSourceRef.current,
+              agenciesDataSourceRef.current,
+            ]);
+          }
+        });
+
         // No imagery layers at all — the globe is a flat ground with country
-        // outlines drawn over it. Nothing here touches the network.
-        viewer.scene.globe.baseColor = GLOBE_BASE_COLOR;
+        // outlines drawn over it. Nothing here touches the network. Water
+        // reads as a distinct, darker tone from land (and a distinct,
+        // lighter tone from the void) by giving the globe itself
+        // GLOBE_WATER_COLOR and filling land polygons with GLOBE_BASE_COLOR
+        // — see the fill assignments below and in the two agencies-mode
+        // effects, which must all agree or land silently disappears into the
+        // water tone whenever fill resets to transparent.
+        viewer.scene.globe.baseColor = GLOBE_WATER_COLOR;
 
         viewer.scene.globe.enableLighting = false;
         viewer.scene.globe.showGroundAtmosphere = false;
@@ -439,7 +564,7 @@ export function Globe() {
             if (entity.polygon) {
               try {
                 entity.polygon.material = new Cesium.ColorMaterialProperty(
-                  Cesium.Color.TRANSPARENT,
+                  GLOBE_BASE_COLOR,
                 );
                 entity.polygon.outline = new Cesium.ConstantProperty(true);
                 entity.polygon.outlineColor = new Cesium.ConstantProperty(
@@ -494,44 +619,15 @@ export function Globe() {
 
               if (entityType === "pad") {
                 const padId = entity.properties?.padId?.getValue();
-                if (padId) {
-                  useLaunchStore.getState().navigateToPad(padId);
-
-                  const position = entity.position?.getValue(
-                    Cesium.JulianDate.now(),
-                  );
-                  if (position) {
-                    const cartographic =
-                      Cesium.Cartographic.fromCartesian(position);
-                    const pad = useLaunchStore
-                      .getState()
-                      .pads.find((p) => p.id === padId);
-                    // No launch is in context for a bare pad click, and
-                    // Pad has no agency_id of its own (LL2 never sends one -
-                    // a pad's operator is only known through its launches),
-                    // so this path can't show an agency line.
-                    setFocusTarget({
-                      padName: pad?.name ?? "Launch pad",
-                      agencyName: null,
-                    });
-                    flyToPadFocus(
-                      clickViewer,
-                      Cesium.Cartesian3.fromRadians(
-                        cartographic.longitude,
-                        cartographic.latitude,
-                        FOCUS_ALTITUDE_METRES,
-                      ),
-                      {
-                        onComplete: () => setFocusTarget(null),
-                        onCancel: () => setFocusTarget(null),
-                      },
-                    );
-                  }
-                }
+                // Flying the camera happens in the selectedPad effect below,
+                // which this also feeds - a bare globe click and a sidebar
+                // pad selection both end up in exactly one place, instead of
+                // each having its own flyTo that can fire at once.
+                if (padId) useLaunchStore.getState().focusPad(padId);
               } else if (entityType === "agency") {
                 const agencyId = entity.properties?.agencyId?.getValue();
                 if (agencyId) {
-                  useLaunchStore.getState().navigateToAgency(agencyId);
+                  useLaunchStore.getState().focusAgency(agencyId);
                 }
               }
             }
@@ -609,7 +705,7 @@ export function Globe() {
       countries.entities.values.forEach((entity) => {
         if (entity.polygon) {
           entity.polygon.material = new Cesium.ColorMaterialProperty(
-            Cesium.Color.TRANSPARENT,
+            GLOBE_BASE_COLOR,
           );
           entity.polygon.outline = new Cesium.ConstantProperty(true);
           entity.polygon.outlineColor = new Cesium.ConstantProperty(
@@ -651,7 +747,7 @@ export function Globe() {
           }
         } else {
           entity.polygon.material = new Cesium.ColorMaterialProperty(
-            Cesium.Color.TRANSPARENT,
+            GLOBE_BASE_COLOR,
           );
           entity.polygon.outline = new Cesium.ConstantProperty(true);
           entity.polygon.outlineColor = new Cesium.ConstantProperty(
@@ -686,6 +782,12 @@ export function Globe() {
       }
       syncPads(padsSource, padsToShow, padCounts);
     }
+
+    // New/changed entities need an initial visibility pass too, not just on
+    // the next camera move.
+    if (viewerRef.current) {
+      updateMarkerVisibility(viewerRef.current, [padsSource, agenciesSource]);
+    }
   }, [
     viewerReady,
     isLoading,
@@ -715,6 +817,7 @@ export function Globe() {
         const highlightPosition = Cesium.Cartesian3.fromDegrees(
           pad.longitude,
           pad.latitude,
+          MARKER_HEIGHT_METRES,
         );
         entity.position = new Cesium.ConstantPositionProperty(
           highlightPosition,
@@ -724,6 +827,11 @@ export function Globe() {
           color: Cesium.Color.WHITE.withAlpha(0.95),
           outlineColor: Cesium.Color.BLACK.withAlpha(0.5),
           outlineWidth: 3,
+          // Safe unconditionally: updateMarkerVisibility already hides
+          // anything genuinely on the far side via entity.show, so a marker
+          // that reaches the GPU at all is meant to be fully visible - no
+          // more per-pixel slicing against the globe's own horizon.
+          disableDepthTestDistance: Number.POSITIVE_INFINITY,
         });
       }
     } else {
@@ -750,6 +858,7 @@ export function Globe() {
           const timelinePosition = Cesium.Cartesian3.fromDegrees(
             pad.longitude,
             pad.latitude,
+            MARKER_HEIGHT_METRES,
           );
           entity.position = new Cesium.ConstantPositionProperty(
             timelinePosition,
@@ -759,6 +868,7 @@ export function Globe() {
             color: Cesium.Color.WHITE.withAlpha(0.8),
             outlineColor: Cesium.Color.BLACK.withAlpha(0.4),
             outlineWidth: 2,
+            disableDepthTestDistance: Number.POSITIVE_INFINITY,
           });
         }
       }
@@ -850,47 +960,77 @@ export function Globe() {
     timelineLaunchesForGlobe,
   ]);
 
-  // Fly to rocket's pads when selected
+  // Fly to the pad a rocket has launched from most, when selected. Previously
+  // flew to the bounding-box centroid of *every* pad the rocket has ever used
+  // - for a rocket launched from geographically separated sites (Baikonur and
+  // Kourou, say), that centroid lands on an empty-ocean midpoint that isn't
+  // any real place, which reads as the flyover going somewhere random. Flying
+  // to an actual pad is always a real, meaningful destination.
   useEffect(() => {
     if (!viewerRef.current || !selectedRocket || globeMode !== "rockets")
       return;
 
     const viewer = viewerRef.current;
     const rocketLaunches = getLaunchesForRocket(launches, selectedRocket.id);
-    const padIds = new Set(
-      rocketLaunches.map((l) => l.pad_id).filter((id): id is number => !!id),
+
+    const countsByPadId = new Map<number, number>();
+    for (const launch of rocketLaunches) {
+      if (!launch.pad_id) continue;
+      countsByPadId.set(
+        launch.pad_id,
+        (countsByPadId.get(launch.pad_id) ?? 0) + 1,
+      );
+    }
+
+    let topPadId: number | null = null;
+    let topCount = -1;
+    for (const [padId, count] of countsByPadId) {
+      if (count > topCount) {
+        topPadId = padId;
+        topCount = count;
+      }
+    }
+    if (topPadId === null) return;
+
+    const pad = padById.get(topPadId);
+    if (!pad) return;
+
+    flyToPadFocus(
+      viewer,
+      Cesium.Cartesian3.fromDegrees(
+        pad.longitude,
+        pad.latitude,
+        FOCUS_ALTITUDE_METRES,
+      ),
     );
-    const rocketPads = pads.filter((p) => padIds.has(p.id));
+  }, [selectedRocket, globeMode, padById, launches]);
 
-    if (rocketPads.length === 0) return;
+  // Fly to a pad when selected - both a bare globe click and a sidebar Pads
+  // tab selection land here (see the click handler above), so there is
+  // exactly one flyTo for "a pad got selected" instead of one per source.
+  // Previously nothing reacted to selectedPad from the sidebar at all, so
+  // selecting a pad there never moved the camera.
+  useEffect(() => {
+    if (!viewerRef.current || !selectedPad) return;
 
-    // Calculate bounding box of all pads
-    const lats = rocketPads.map((p) => p.latitude);
-    const lons = rocketPads.map((p) => p.longitude);
-    const minLat = Math.min(...lats);
-    const maxLat = Math.max(...lats);
-    const minLon = Math.min(...lons);
-    const maxLon = Math.max(...lons);
+    // Pad has no agency_id of its own (LL2 never sends one - a pad's
+    // operator is only known through its launches), so this can't show an
+    // agency line the way a launch-triggered focus can.
+    setFocusTarget({ padName: selectedPad.name, agencyName: null });
 
-    const centerLat = (minLat + maxLat) / 2;
-    const centerLon = (minLon + maxLon) / 2;
-    const latSpan = maxLat - minLat;
-    const lonSpan = maxLon - minLon;
-    const maxSpan = Math.max(latSpan, lonSpan);
-
-    // Calculate appropriate height based on span
-    const height =
-      maxSpan > 10
-        ? 2_000_000
-        : maxSpan > 5
-          ? 1_000_000
-          : FOCUS_ALTITUDE_METRES;
-
-    viewer.camera.flyTo({
-      destination: Cesium.Cartesian3.fromDegrees(centerLon, centerLat, height),
-      duration: 2,
-    });
-  }, [selectedRocket, globeMode, pads, launches]);
+    flyToPadFocus(
+      viewerRef.current,
+      Cesium.Cartesian3.fromDegrees(
+        selectedPad.longitude,
+        selectedPad.latitude,
+        FOCUS_ALTITUDE_METRES,
+      ),
+      {
+        onComplete: () => setFocusTarget(null),
+        onCancel: () => setFocusTarget(null),
+      },
+    );
+  }, [selectedPad]);
 
   // Highlight selected launch. playTimeline()'s auto-advance also sets
   // selectedLaunch on every step, so this is what flies the camera during
@@ -943,11 +1083,14 @@ export function Globe() {
         )}
 
         {/* Close-up card for the selected launch's pad, including during
-            timeline playback - selectedLaunch updates on every step. */}
+            timeline playback (selectedLaunch updates on every step), or for
+            a pad selected directly with no launch in context. */}
         {showInset && (
           <PadInsetView
             pad={
-              selectedLaunch?.pad_id ? padById.get(selectedLaunch.pad_id) : null
+              selectedLaunch?.pad_id
+                ? padById.get(selectedLaunch.pad_id)
+                : selectedPad
             }
             launch={selectedLaunch}
           />
@@ -1076,6 +1219,7 @@ function syncPads(
     const padPosition = Cesium.Cartesian3.fromDegrees(
       pad.longitude,
       pad.latitude,
+      MARKER_HEIGHT_METRES,
     );
     entity.position = new Cesium.ConstantPositionProperty(padPosition);
     entity.point = new Cesium.PointGraphics({
@@ -1083,6 +1227,7 @@ function syncPads(
       color: style.color,
       outlineColor: style.outlineColor,
       outlineWidth: style.outlineWidth,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
     });
     entity.properties = new Cesium.PropertyBag({
       type: "pad",
@@ -1117,6 +1262,7 @@ function syncAgencies(
     const agencyPosition = Cesium.Cartesian3.fromDegrees(
       agency.longitude,
       agency.latitude,
+      MARKER_HEIGHT_METRES,
     );
     entity.position = new Cesium.ConstantPositionProperty(agencyPosition);
     entity.point = new Cesium.PointGraphics({
@@ -1124,17 +1270,34 @@ function syncAgencies(
       color: Cesium.Color.WHITE.withAlpha(0.85),
       outlineColor: Cesium.Color.BLACK.withAlpha(0.45),
       outlineWidth: 2,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
     });
     entity.label = new Cesium.LabelGraphics({
       text: agency.abbrev || agency.name,
-      font: "13px Inter, sans-serif",
+      // Was "13px Inter" - Inter isn't a font this app loads at all, so it
+      // silently fell back to the browser default sans-serif at a normal
+      // weight, reading thin and small next to the rest of the UI's Archivo
+      // 800 headings. Archivo is already self-hosted (theme.css) for exactly
+      // this reason.
+      font: "bold 15px Archivo, sans-serif",
       fillColor: Cesium.Color.WHITE.withAlpha(0.9),
       outlineColor: Cesium.Color.BLACK.withAlpha(0.6),
       outlineWidth: 3,
       style: Cesium.LabelStyle.FILL_AND_OUTLINE,
       verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
       pixelOffset: new Cesium.Cartesian2(0, -18),
-      scale: 0.9,
+      scale: 1,
+      disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      // Cesium's Entity API has no built-in label-collision decluttering -
+      // with ~350 agencies, showing every label at the default 20,000km
+      // overview (DEFAULT_CAMERA_DESTINATION) is unreadable mush in dense
+      // regions. Labels only render once the camera is within regional
+      // range; points (below) stay visible at every zoom so the overview
+      // still shows where agencies are, just without the text pile-up.
+      distanceDisplayCondition: new Cesium.DistanceDisplayCondition(
+        0,
+        AGENCY_LABEL_MAX_DISTANCE_METRES,
+      ),
     });
     entity.properties = new Cesium.PropertyBag({
       type: "agency",
@@ -1170,16 +1333,13 @@ function getPadStyle(launchCount: number) {
 }
 
 /**
- * Country shading in agencies mode. Previously white at 10–35% alpha, which
- * was invisible at the low end against a dark ground; the accent carries it
- * further and reads as one ramp with the pad markers.
+ * Country shading in agencies mode. Previously alpha-blended the accent
+ * color over the globe's base color, which banded harshly once water and
+ * land became different tones — solid fills from the same accent ramp
+ * already used for pad markers (padTiers.ts) read as one system with
+ * pad-activity shading instead of drifting from it, and don't depend on
+ * whatever happens to be underneath.
  */
 function getCountryFillColor(count: number): Cesium.Color {
-  const accent = Cesium.Color.fromCssColorString("#ec3013");
-  let alpha = 0.14;
-  if (count > 20) alpha = 0.5;
-  else if (count > 10) alpha = 0.42;
-  else if (count > 5) alpha = 0.34;
-  else if (count > 2) alpha = 0.26;
-  return accent.withAlpha(alpha);
+  return Cesium.Color.fromCssColorString(agencyCountryTierFor(count).fill);
 }

@@ -26,3 +26,28 @@ export function tierFor(launchCount: number): PadTier {
     PAD_TIERS[PAD_TIERS.length - 1]
   );
 }
+
+/**
+ * Country shading in Agencies mode: how many agencies are headquartered in
+ * that country. Reuses the same accent ramp as PAD_TIERS so agency-count
+ * shading reads as one system with pad-activity shading, not a second,
+ * unrelated color scale - but the buckets are its own, since "agencies in a
+ * country" and "launches from a pad" are different quantities on different
+ * scales. Shared between Globe.tsx's fill color and the Legend for the same
+ * reason PAD_TIERS is: one list, not two that can drift apart.
+ */
+export const AGENCY_COUNTRY_TIERS = [
+  { min: 21, label: "20 or more", fill: "#ff563c" },
+  { min: 11, label: "11 to 20", fill: "#ec3013" },
+  { min: 6, label: "6 to 10", fill: "#ae1800" },
+  { min: 1, label: "1 to 5", fill: "#7c1405" },
+] as const;
+
+type AgencyCountryTier = (typeof AGENCY_COUNTRY_TIERS)[number];
+
+export function agencyCountryTierFor(count: number): AgencyCountryTier {
+  return (
+    AGENCY_COUNTRY_TIERS.find((tier) => count >= tier.min) ??
+    AGENCY_COUNTRY_TIERS[AGENCY_COUNTRY_TIERS.length - 1]
+  );
+}

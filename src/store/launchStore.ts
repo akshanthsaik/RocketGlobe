@@ -163,6 +163,12 @@ interface LaunchStoreState {
   navigateToPad: (padId: number) => void;
   navigateToRocket: (rocketId: number) => void;
   navigateToAgency: (agencyId: number) => void;
+
+  // Globe-click focus: shows the pad/agency inset overlay (selectedPad/
+  // selectedAgency) without pushing a sidebar breadcrumb - a glance at a
+  // marker isn't the same as deliberately drilling into the sidebar.
+  focusPad: (padId: number) => void;
+  focusAgency: (agencyId: number) => void;
 }
 
 // Helpers - Fixed to be more lenient and accurate
@@ -573,7 +579,20 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
     return inFlightFetchAllData;
   },
 
+  // Timeline auto-play only has a globe to fly around and a launch list to
+  // scrub in "launches" mode - navigating to Pads/Rockets/Agencies leaves
+  // playTimeline()'s setTimeout loop running in the background otherwise
+  // (it isn't tied to the Timeline component's mount state), which keeps
+  // yanking the camera via Globe.tsx's selectedLaunch-follow effect. Stop
+  // playback and turn the timeline off, mirroring setLaunchTab's handling
+  // of the same "no longer a valid context" case for the Launches sub-tabs.
   setGlobeMode: (mode) => {
+    if (mode !== "launches") {
+      get().pauseTimeline();
+      if (get().timelineEnabled) {
+        set({ timelineEnabled: false });
+      }
+    }
     set({ globeMode: mode });
     get().resetSidebarView();
   },
@@ -855,5 +874,15 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
       set({ selectedAgency: agency, sidebarOpen: true });
       get().pushSidebarView({ type: "agency-detail", data: agency });
     }
+  },
+
+  focusPad: (padId) => {
+    const pad = get().pads.find((p) => p.id === padId);
+    if (pad) set({ selectedPad: pad });
+  },
+
+  focusAgency: (agencyId) => {
+    const agency = get().agencies.find((a) => a.id === agencyId);
+    if (agency) set({ selectedAgency: agency });
   },
 }));

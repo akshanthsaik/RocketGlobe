@@ -1,5 +1,4 @@
-from sqlalchemy import Column, Float, ForeignKey, Integer, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Float, Integer, Text
 
 from .base import Base, TimestampMixin
 
@@ -15,6 +14,3 @@ class Pad(Base, TimestampMixin):
     country_code = Column(Text, index=True)  # No limit
     map_url = Column(Text)  # No limit
     total_launch_count = Column(Integer, default=0)
-    agency_id = Column(Integer, ForeignKey("agencies.id"))
-
-    agency = relationship("Agency", backref="pads")

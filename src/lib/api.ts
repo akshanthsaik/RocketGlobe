@@ -1,10 +1,10 @@
-export const API_BASE_URL =
+const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000/api";
 
-export const API_ORIGIN = new URL(API_BASE_URL).origin;
+const API_ORIGIN = new URL(API_BASE_URL).origin;
 const ADMIN_TOKEN = import.meta.env.VITE_ADMIN_TOKEN?.trim();
 
-export function getAdminAuthHeaders(): HeadersInit {
+function getAdminAuthHeaders(): HeadersInit {
   if (!ADMIN_TOKEN) {
     return {};
   }
@@ -52,7 +52,6 @@ export interface Pad {
   country_code?: string | null;
   map_url?: string | null;
   total_launch_count: number;
-  agency_id?: number | null;
 }
 
 export interface Rocket {
@@ -108,7 +107,7 @@ export const SYNC_STAGES = ["agencies", "pads", "rockets", "launches"] as const;
 
 export type SyncStage = (typeof SYNC_STAGES)[number];
 
-export type SyncRunStatus =
+type SyncRunStatus =
   | "queued"
   | "running"
   | "success"

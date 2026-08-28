@@ -1,4 +1,6 @@
-# RocketGlobe
+# Development Guide
+
+Architecture, data model, API surface, sync internals, and local setup for working on RocketGlobe's code. Looking to just download and run the app instead? See the [main README](../README.md).
 
 RocketGlobe is a Tauri desktop application that renders global launch activity on a Cesium globe. It ships with a local FastAPI backend that ingests Launch Library 2 (LL2) data and serves a read-only API for the UI.
 
@@ -101,6 +103,7 @@ flowchart TB
 
 - SQLite, stored as a single file (`DATABASE_URL=sqlite:///./rocketglobe.db` by default in dev). In packaged release builds it lives under the app's local data directory so each user's synced data persists across app updates.
 - Migrations exist under `backend/alembic/versions`. Alembic runs with `render_as_batch=True` on SQLite so future column changes go through the temp-table-rebuild path SQLite requires.
+- `seed_if_missing()` (`backend/app/database.py`) runs at backend startup and at the top of `alembic/env.py`: if the `DATABASE_URL` sqlite file doesn't exist yet, it's copied from the committed offline snapshot (`backend/seed_data/rocketglobe_seed.db`) instead of starting from an empty schema. It never touches a database file that already exists, synced or not. This is dev-only — packaged release builds (`release-windows.ps1`) still initialize an empty schema and rely on a live sync.
 - `pads.latitude`/`pads.longitude` are plain floats; there is no PostGIS/geospatial extension in use.
 
 ## Data Model (Backend)
@@ -301,8 +304,8 @@ Environment variables override code defaults. Confirm effective values from back
 | `LL2_EXISTING_DATA_LOOKBACK_HOURS`     | `24`                                | Fallback incremental baseline window when sync state is missing    |
 | `LL2_ALLOW_PARTIAL_SYNC_ON_RATE_LIMIT` | `True`                              | If true, sync completes as partial when LL2 rate-limits a resource |
 | `SQL_ECHO`                             | `False`                             | SQLAlchemy SQL echo                                                |
-| `API_HOST`                             | `localhost`                         | Backend host setting                                               |
-| `API_PORT`                             | `8000`                              | Backend port setting                                               |
+| `API_HOST`                             | `127.0.0.1`                         | Host uvicorn binds to (`run_backend.py` and `python app/main.py`)  |
+| `API_PORT`                             | `8000`                              | Port uvicorn binds to (`run_backend.py` and `python app/main.py`)  |
 
 **Frontend env vars**
 

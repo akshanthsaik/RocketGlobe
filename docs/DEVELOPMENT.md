@@ -87,7 +87,7 @@ flowchart TB
 - Initial data bootstrap retries API reads (up to 8 attempts) to tolerate backend startup lag.
 - Dev server runs on `http://localhost:1420` in Tauri dev mode.
 - Shared cross-component logic (pagination, per-entity launch counts/splits, debounced search, overlay positioning) lives in `src/hooks/`.
-- ESLint (`eslint.config.js`) + Prettier + `tsc --noEmit` for static checks; Vitest (`vitest.config.ts`) for unit tests, currently covering store selectors and the shared hooks.
+- ESLint (`eslint.config.js`) + Prettier + `tsc --noEmit` for static checks; Vitest (`vitest.config.ts`) for unit tests, covering the store, the shared hooks, and extracted pure-logic modules (`padTiers.test.ts`, `syncStages.test.ts`, `lib/utils.test.ts`).
 
 **Backend**
 
@@ -103,7 +103,7 @@ flowchart TB
 
 - SQLite, stored as a single file (`DATABASE_URL=sqlite:///./rocketglobe.db` by default in dev). In packaged release builds it lives under the app's local data directory so each user's synced data persists across app updates.
 - Migrations exist under `backend/alembic/versions`. Alembic runs with `render_as_batch=True` on SQLite so future column changes go through the temp-table-rebuild path SQLite requires.
-- `seed_if_missing()` (`backend/app/database.py`) runs at backend startup and at the top of `alembic/env.py`: if the `DATABASE_URL` sqlite file doesn't exist yet, it's copied from the committed offline snapshot (`backend/seed_data/rocketglobe_seed.db`) instead of starting from an empty schema. It never touches a database file that already exists, synced or not. This applies in both dev and packaged release builds — `tauri.conf.json` bundles the seed snapshot as a resource specifically so a fresh install has real data without needing a live first sync (LL2's anonymous tier is ~15 requests/hour). The seed path (`_SEED_DB_PATH`) is resolved relative to the process's working directory, not `__file__` — inside a frozen PyInstaller exe, `__file__` doesn't point anywhere useful, while Rust's `cmd.current_dir(&backend_dir)` reliably sets the right working directory in both modes.
+- `seed_if_missing()` (`backend/app/database.py`) runs at backend startup and at the top of `alembic/env.py`: if the `DATABASE_URL` sqlite file doesn't exist yet, it's copied from the committed offline snapshot (`backend/seed_data/rocketglobe_seed.db`) instead of starting from an empty schema, and never touches a file that already exists. Runs in both dev and packaged builds, so a fresh install has real data without a live first sync (LL2's anonymous tier is ~15 requests/hour). The seed path (`_SEED_DB_PATH`) resolves against the process's working directory rather than `__file__`, since `__file__` is useless inside a frozen PyInstaller exe.
 - `pads.latitude`/`pads.longitude` are plain floats; there is no PostGIS/geospatial extension in use.
 
 ## Data Model (Backend)
@@ -200,20 +200,11 @@ Run status values (`sync_runs.status`):
 - `failed`: sync aborted due to non-recoverable exception.
 - `blocked`: did not start because another run held the lock.
 
-Useful fields in `GET /admin/sync-status`:
-
-- `run.run_id`: stable id to poll the same run.
-- `run.error`: failure reason (for example `LL2 rate limit window too long ...`).
-- `run.stats`: per-resource counts; includes `"_skipped"` for resources intentionally skipped.
-- `run.stats._rate_limited`: per-resource retry windows in seconds when rate-limited.
-- `is_sync_running`: true only for active queued/running runs.
-- `retry_after_seconds`: max retry window (seconds) derived from `run.stats._rate_limited`.
-- `rate_limited_resources`: flattened map of resource -> retry seconds.
-- `POST /admin/sync` may return `retry_after_seconds` directly when a cooldown pre-check blocks the run.
+`run.run_id` is the stable id to poll the same run across requests; the rest of the response shape is documented at `/docs`. `POST /admin/sync` can also return `retry_after_seconds` directly when a cooldown pre-check blocks the run before one even starts.
 
 **Seed snapshot (`backend/tools/build_seed_snapshot.py`)**
 
-LL2's anonymous tier is ~15 requests/hour, which a fresh install's first full-history sync can exceed immediately (confirmed with The Space Devs: bulk-crawling once and caching a snapshot is the expected pattern, rather than every install re-crawling full history). This is a separate, deliberately patient tool — not the live per-user sync above — meant to be run by hand, unattended, for as long as a full crawl takes:
+LL2's anonymous tier (~15 requests/hour) can't sustain a fresh install's first full-history sync (confirmed with The Space Devs: crawling once and caching a snapshot is the expected pattern). This separate, deliberately patient tool builds that snapshot — run by hand, unattended, for as long as a full crawl takes:
 
 ```bash
 cd backend
@@ -222,56 +213,17 @@ python tools/build_seed_snapshot.py --out seed_data/rocketglobe_seed.db
 
 - Defaults to production LL2 regardless of `backend/.env` (a seed built from the dev sandbox's small dataset would be useless).
 - Sleeps through rate-limit windows instead of failing fast, and checkpoints progress to disk after every page, so it's safe to Ctrl+C and re-run to resume.
-- Resulting `.db` file is the historical seed intended to ship with the app (or be loaded once on first run); the live sync then only needs to fetch new/changed data per user.
+- Resulting `.db` ships with the app as the historical seed; the live per-user sync then only fetches new/changed data.
 
 ## Sync Troubleshooting
 
-**Symptom: sync ends quickly with a rate-limit message**
+**Symptom: sync ends quickly with a rate-limit message** (`LL2 rate limit window too long ... max allowed wait is ...s`)
 
-Example error:
-
-`LL2 rate limit window too long (3131.0s) ... max allowed wait is 120s`
-
-What this means:
-
-- LL2 asked the client to wait longer than your configured maximum.
-- With partial mode enabled, the run finishes as `partial` and reports retry metadata instead of sleeping for many minutes.
-
-What to do:
-
-1. Check throttle info:
-
-```powershell
-curl.exe -s http://127.0.0.1:8000/admin/api-throttle
-```
-
-2. Retry sync later, or increase wait budgets if you prefer waiting over skip/fail-fast:
-   `LL2_MAX_WAIT_SECONDS`, `LL2_MAX_REQUEST_DURATION`, `LL2_LAUNCHES_MAX_WAIT_SECONDS`, `LL2_LAUNCHES_MAX_REQUEST_DURATION`.
-
-3. Check backend startup logs for the active runtime config line:
-
-`LL2 config: ... retries=... max_wait=... max_duration=...`
-
-If this still shows legacy values (for example retries `40` and max wait `600`), your local backend `.env` has older overrides; update or remove those variables.
+LL2 asked the client to wait longer than the configured maximum; with partial mode enabled the run finishes as `partial` and reports retry metadata instead of sleeping. Check `GET /admin/api-throttle` for current throttle state, then either retry later or raise the wait budgets (`LL2_MAX_WAIT_SECONDS`, `LL2_MAX_REQUEST_DURATION`, `LL2_LAUNCHES_MAX_WAIT_SECONDS`, `LL2_LAUNCHES_MAX_REQUEST_DURATION`). If the backend startup log's `LL2 config: ...` line doesn't reflect the values you set, your local backend `.env` has stale overrides.
 
 **Symptom: `POST /admin/sync` returns 409**
 
-- This indicates a run is already active.
-- Use the returned `run_id` and poll that run instead of starting a new one.
-
-Manual poll example (PowerShell):
-
-```powershell
-$sync = curl.exe -s -X POST http://127.0.0.1:8000/admin/sync | ConvertFrom-Json
-$runId = $sync.run_id
-while ($true) {
-  $st = curl.exe -s "http://127.0.0.1:8000/admin/sync-status?run_id=$runId" | ConvertFrom-Json
-  "$($st.run.status) | $($st.run.current_resource) | $($st.run.progress_done)/$($st.run.progress_total)"
-  if (-not $st.is_sync_running) { break }
-  Start-Sleep -Seconds 3
-}
-$st.run | Format-List
-```
+A run is already active — use the returned `run_id` to poll `GET /admin/sync-status?run_id=...` instead of starting a new one.
 
 ## Configuration
 
@@ -314,11 +266,13 @@ Environment variables override code defaults. Confirm effective values from back
 | Variable            | Default                     | Purpose                |
 | ------------------- | --------------------------- | ---------------------- |
 | `VITE_API_BASE_URL` | `http://127.0.0.1:8000/api` | Base URL for API calls |
-| `VITE_ADMIN_TOKEN`  | unset                       | Sent as `X-Admin-Token` on admin calls via `adminFetch` (`src/lib/api.ts`); must match the backend's `ADMIN_TOKEN`. Vite auto-loads this into the frontend bundle from `.env`, but `src-tauri` (Rust) does not parse `.env` files — to also apply it to the dev-spawned backend, export `VITE_ADMIN_TOKEN` in your shell before `bun run tauri dev`, not just in this file. |
+| `VITE_ADMIN_TOKEN`  | unset                       | Sent as `X-Admin-Token` on admin calls via `adminFetch` (`src/lib/api.ts`); must match the backend's `ADMIN_TOKEN`. |
 
 The globe renders without imagery tiles — a flat ground with country outlines
 drawn from GeoJSON — so no Cesium Ion token is required and the globe works
 with no network.
+
+`VITE_ADMIN_TOKEN` only reaches the backend if the process spawning it sees the same variable: Vite bakes it into the frontend bundle from `.env`, but `src-tauri` doesn't parse `.env` files, so export it in your shell before `bun run tauri dev` (dev) or before launching the installed app (release) — `spawn_backend` in `lib.rs` forwards it as `ADMIN_TOKEN` identically in both modes. The release pipeline (`scripts/release-windows.ps1`) never sets it, so `ADMIN_TOKEN` protection is effectively dev-only unless done by hand.
 
 **Tauri env vars**
 
@@ -409,17 +363,17 @@ Current Tauri bundle resources are configured in `src-tauri/tauri.conf.json` (ob
 Important behavior:
 
 - Debug build: Tauri starts backend via `backend/venv` Python + `uvicorn`. `DATABASE_URL` comes from `backend/.env`, defaulting to `sqlite:///./rocketglobe.db`.
-- Release build: Tauri starts bundled `run_backend.exe` with `DATABASE_URL` pointed at `<app_local_data_dir>/rocketglobe.db` (see `resolve_release_database_url` in `src-tauri/src/lib.rs`), so each user's synced data lives in a single file that persists across app updates. `resolve_backend_dir()`'s release branch resolves `resources/backend` (not `backend`) under `BaseDirectory::Resource` — it must match the resource paths above exactly, or the bundled exe silently isn't where Rust expects it and the app panics on launch with "Bundled backend executable not found".
-- `src-tauri/resources/` is gitignored in this repo, so those artifacts must exist locally before `tauri build` — `bun run release:windows` builds them for you (see Windows Release below); a bare `bun run tauri build` does not.
-- `tauri-plugin-single-instance` is registered first in the builder chain (`src-tauri/src/lib.rs`). Without it, a second launch while the first is still cold-starting (PyInstaller onefile extraction takes a few seconds) spawns a second full app + backend racing for port 8000 — the loser fails to bind and shows a "local database did not answer" error that looks like a real crash. A second launch now just focuses the existing window instead.
+- Release build: Tauri starts bundled `run_backend.exe` with `DATABASE_URL` pointed at `<app_local_data_dir>/rocketglobe.db` (`resolve_release_database_url` in `lib.rs`), so each user's data persists across updates. `resolve_backend_dir()` resolves `resources/backend` under `BaseDirectory::Resource` in release — it must match the resource paths above exactly, or the app panics on launch with "Bundled backend executable not found".
+- `src-tauri/resources/` is gitignored, so those artifacts must exist locally before `tauri build` — `bun run release:windows` builds them (see Windows Release below); a bare `bun run tauri build` does not.
+- `tauri-plugin-single-instance` is registered first in the builder chain (`lib.rs`) — without it, a second launch during cold PyInstaller extraction spawns a second app + backend racing for port 8000, and the loser's failed bind looks like a real crash. A second launch now just focuses the existing window.
 
 ### CORS and CSP for the packaged webview
 
-Two completely different browser mechanisms gate the packaged app's HTTP calls to its own local backend, and both must be right or the UI silently breaks with no server-side symptom to debug from:
+Two separate browser mechanisms gate the packaged app's calls to its own local backend; get either wrong and the UI breaks with no server-side symptom to debug from.
 
-- **CORS** (`CORSMiddleware.allow_origins` in `backend/app/main.py`) must include `http://tauri.localhost` — this is the actual origin a packaged Tauri v2 app uses on Windows, which is a *different string* from both Vite's dev origin (`http://localhost:1420`, why `tauri dev` never catches this class of bug) and the legacy Tauri v1 scheme `tauri://localhost` (easy to add by mistake since it looks more "correct"). Get this wrong and every request from the packaged UI to the backend still completes with a real `200` — the backend logs look completely healthy — but the browser withholds the response from JS with no `Access-Control-Allow-Origin` header to permit it. The frontend then shows "Failed to fetch" with nothing useful in the network tab unless DevTools' console (not just the network panel) is open.
-- **CSP** (`app.security.csp` in `src-tauri/tauri.conf.json`) must allow Cesium's runtime needs, which the permissive `devCsp` (`'unsafe-eval'`) masks entirely in `tauri dev`: `script-src` needs `'wasm-unsafe-eval'` (WebAssembly compilation) **and** `blob:` (not just `worker-src`) — Cesium's geometry-processing Web Workers spawn fine under `worker-src 'self' blob:` alone, but each worker then calls `importScripts()` on a `blob:` URL to load its actual bundled code, and that nested load is governed by `script-src` inherited into the worker's own context, not `worker-src`. Missing the `script-src blob:` piece produces a working app with data loaded but an invisible globe — pad markers render (a different, non-worker pipeline) while every country-outline polygon silently fails to build.
-- Diagnosing either of these in a packaged build requires real console access. The cleanest way, without shipping a debug build: launch the installed exe with `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` set, then attach to `http://127.0.0.1:9222/json` for a list of Chrome DevTools Protocol targets and open a WebSocket to the main page's `webSocketDebuggerUrl` — this works whether or not Tauri's `devtools` Cargo feature is enabled.
+- **CORS** (`CORSMiddleware.allow_origins` in `backend/app/main.py`) must include `http://tauri.localhost` — the actual origin a packaged Tauri v2 app uses on Windows, distinct from both Vite's dev origin (why `tauri dev` never catches this) and the legacy v1 scheme `tauri://localhost` (easy to add by mistake). Miss it and requests still complete with a real `200` in the backend logs, but the browser withholds the response from JS — the frontend shows "Failed to fetch" with nothing in the network tab unless DevTools' console is open.
+- **CSP** (`app.security.csp` in `src-tauri/tauri.conf.json`) needs `'wasm-unsafe-eval'` **and** `blob:` in `script-src` — not just `worker-src` — for Cesium. Its geometry workers spawn fine under `worker-src 'self' blob:` alone, but each then loads its code via `importScripts()` on a `blob:` URL, which `script-src` governs. Miss `script-src blob:` and you get a working app with an invisible globe: pad markers render, country outlines don't. `devCsp`'s `'unsafe-eval'` masks this entirely in dev.
+- To debug either in a packaged build: launch the installed exe with `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222`, then attach to `http://127.0.0.1:9222/json` for a list of CDP targets and open a WebSocket to the main page's `webSocketDebuggerUrl`.
 
 ## Windows Release
 
@@ -452,22 +406,6 @@ Output artifacts are placed under:
 
 If only `src-tauri/` changed (no frontend or backend edits), `bun run tauri build` alone is enough — it re-runs `beforeBuildCommand` (`bun run build`) and re-bundles, but skips the backend venv/exe rebuild steps above.
 
-**GitHub Actions release workflow** (`.github/workflows/release.yml`): triggers on pushing a `v*` tag, runs the same `release-windows.ps1` pipeline on a Windows runner, then globs the `.msi`/`.exe` bundle output and publishes them to a GitHub Release via `gh release create --generate-notes`. As of this writing it has only been read, never exercised by an actual tag push — treat a first real release as the first real test of this workflow, not as a known-good path.
+**GitHub Actions release workflow** (`.github/workflows/release.yml`): triggers on a `v*` tag push, runs the same `release-windows.ps1` pipeline on a Windows runner, then globs the `.msi`/`.exe` output and publishes a GitHub Release via `gh release create --generate-notes`. Never exercised by a real tag push — treat the first real release as this workflow's first real test.
 
-### Runtime Requirements On Target Machines
-
-- System Python is not required for release mode when using bundled `run_backend.exe`.
-- No database server is required on the target machine — SQLite is a single file managed entirely by the app.
-
-## Project Context
-
-This project was built as an exploratory learning project and evolved over roughly 4 months. It was not originally scoped as a production-grade architecture exercise, so some decisions favor iteration speed over clean system boundaries.
-
-For full context: most Rust work was heavily assisted (vibe-coded), and much of the frontend optimization was done with Codex and older Claude models depending on what free tooling was available. The backend originally used PostgreSQL + PostGIS; it was migrated to SQLite since the app is a single-user local mirror of LL2 data and never used PostGIS's spatial query functions (pad coordinates are plain lat/lon floats).
-
-## Known Limitations
-
-- Backend process management is coupled to Tauri startup and can be fragile across environments.
-- LL2 throttling behavior can still limit how fresh launches data can be in a given sync window, especially on the very first full sync.
-- The GitHub Actions release workflow (`.github/workflows/release.yml`) has not yet been exercised by a real tag push — see Windows Release above.
-- Architectural boundaries between desktop runtime, backend runtime, and data layer are functional but not yet minimal.
+Target machines need no system Python (bundled `run_backend.exe`) and no database server (SQLite is a single file managed entirely by the app).

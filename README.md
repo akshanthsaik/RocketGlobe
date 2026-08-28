@@ -14,7 +14,7 @@ Run the installer, launch the app. No separate Python, Rust, or database setup n
 
 ## What it does
 
-- **Globe view** — pads and agencies plotted on a flat, schematic globe (no imagery tiles, so it works with zero network access beyond the data sync itself), colored by launch activity.
+- **Globe view** — pads and agencies plotted on a flat, schematic globe, colored by launch activity, with no imagery tiles to load.
 - **Launches, pads, rockets, agencies** — browse and filter every entity in the local database, with search, status, country, orbit, and schedule filters.
 - **Timeline** — scrub or auto-play through launch history from the first tracked launch up to today, with the camera following along.
 - **Background sync** — pulls new and updated launches from Launch Library 2 without blocking the UI, with built-in handling for LL2's rate limits.

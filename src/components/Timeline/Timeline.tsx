@@ -10,7 +10,7 @@ import { formatDateShort } from "../../lib/utils";
 import { Icon } from "../common/Icon";
 import "./Timeline.css";
 
-const TIMELINE_SPEEDS = [0.5, 1, 2, 5, 10] as const;
+const TIMELINE_SPEEDS = [1, 2] as const;
 
 /** Named stretches of spaceflight history, used to label where the scrubber
  *  currently sits. Ranges are inclusive and ordered oldest first. */
@@ -267,7 +267,7 @@ export function Timeline() {
           </button>
         </div>
 
-        <div className="speed">
+        <div>
           <span className="speed-label">Speed</span>
           <div className="speed-options">
             {TIMELINE_SPEEDS.map((speed) => (

@@ -18,7 +18,7 @@ export type Agency = APIAgency;
 export type Rocket = APIRocket;
 
 export type GlobeMode = "launches" | "pads" | "rockets" | "agencies";
-export type ViewType =
+type ViewType =
   | "launch-list"
   | "launch-detail"
   | "pad-detail"
@@ -97,7 +97,7 @@ interface LaunchStoreState {
   // Timeline (launches mode only)
   timelineDate: Date | null;
   isTimelinePlaying: boolean;
-  timelineSpeed: 0.5 | 1 | 2 | 5 | 10;
+  timelineSpeed: 1 | 2;
   timelineRange: [Date, Date] | null;
 
   // Filters
@@ -141,7 +141,7 @@ interface LaunchStoreState {
   playTimeline: () => void;
   pauseTimeline: () => void;
   resetTimeline: () => void;
-  setTimelineSpeed: (speed: 0.5 | 1 | 2 | 5 | 10) => void;
+  setTimelineSpeed: (speed: 1 | 2) => void;
   nextLaunch: () => void;
   prevLaunch: () => void;
   setTimelineEnabled: (enabled: boolean) => void;
@@ -236,7 +236,7 @@ export const isPreviousLaunch = (launch: Launch): boolean => {
  *
  * Shared by the tab strip and the header so the two can never disagree.
  */
-export interface LaunchTabCounts {
+interface LaunchTabCounts {
   upcoming: number;
   decided: number;
   previous: number;
@@ -400,7 +400,7 @@ const firstViewForMode = (globeMode: GlobeMode): ViewType => {
   return "launch-list";
 };
 
-export interface YearBucket {
+interface YearBucket {
   year: number;
   count: number;
 }
@@ -643,8 +643,24 @@ export const useLaunchStore = create<LaunchStoreState>((set, get) => ({
   },
 
   toggleSidebar: () => set({ sidebarOpen: !get().sidebarOpen }),
-  setTimelineEnabled: (enabled) => set({ timelineEnabled: enabled }),
-  setLaunchTab: (tab) => set({ launchTab: tab }),
+  // The timeline only ever scrubs from the earliest launch up to today
+  // (timelineRange's upper bound) - it can never reach a launch on the
+  // Upcoming or Decided tabs, since those are defined as being after today.
+  // Enabling it while on either tab intersects to an empty list that stays
+  // empty no matter where you scrub, so it forces Previous, the one tab the
+  // timeline can actually produce results against. Switching away from
+  // Previous while playing would recreate the same empty state, so that
+  // disables the timeline instead of leaving it silently stuck.
+  setTimelineEnabled: (enabled) =>
+    set({
+      timelineEnabled: enabled,
+      ...(enabled ? { launchTab: "previous" } : {}),
+    }),
+  setLaunchTab: (tab) =>
+    set({
+      launchTab: tab,
+      timelineEnabled: tab === "previous" ? get().timelineEnabled : false,
+    }),
 
   selectLaunch: (launch) => {
     set({

@@ -1,0 +1,46 @@
+name: Release
+
+# Builds the Windows installer and publishes it to a GitHub Release whenever
+# a version tag (v*) is pushed. Wraps the same scripts/release-windows.ps1
+# used for a local release build, so there is exactly one build recipe.
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build release
+        shell: powershell
+        run: ./scripts/release-windows.ps1
+
+      - name: Create GitHub Release
+        shell: powershell
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $files = Get-ChildItem -Path "src-tauri/target/release/bundle" -Recurse -Include *.exe,*.msi -ErrorAction Stop
+          if ($files.Count -eq 0) {
+            throw "No installer artifacts found under src-tauri/target/release/bundle"
+          }
+          $files | ForEach-Object { Write-Host "Found artifact: $($_.FullName)" }
+          gh release create "${{ github.ref_name }}" --title "${{ github.ref_name }}" --generate-notes @($files.FullName)

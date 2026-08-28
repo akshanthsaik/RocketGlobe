@@ -103,7 +103,7 @@ flowchart TB
 
 - SQLite, stored as a single file (`DATABASE_URL=sqlite:///./rocketglobe.db` by default in dev). In packaged release builds it lives under the app's local data directory so each user's synced data persists across app updates.
 - Migrations exist under `backend/alembic/versions`. Alembic runs with `render_as_batch=True` on SQLite so future column changes go through the temp-table-rebuild path SQLite requires.
-- `seed_if_missing()` (`backend/app/database.py`) runs at backend startup and at the top of `alembic/env.py`: if the `DATABASE_URL` sqlite file doesn't exist yet, it's copied from the committed offline snapshot (`backend/seed_data/rocketglobe_seed.db`) instead of starting from an empty schema. It never touches a database file that already exists, synced or not. This is dev-only — packaged release builds (`release-windows.ps1`) still initialize an empty schema and rely on a live sync.
+- `seed_if_missing()` (`backend/app/database.py`) runs at backend startup and at the top of `alembic/env.py`: if the `DATABASE_URL` sqlite file doesn't exist yet, it's copied from the committed offline snapshot (`backend/seed_data/rocketglobe_seed.db`) instead of starting from an empty schema. It never touches a database file that already exists, synced or not. This applies in both dev and packaged release builds — `tauri.conf.json` bundles the seed snapshot as a resource specifically so a fresh install has real data without needing a live first sync (LL2's anonymous tier is ~15 requests/hour). The seed path (`_SEED_DB_PATH`) is resolved relative to the process's working directory, not `__file__` — inside a frozen PyInstaller exe, `__file__` doesn't point anywhere useful, while Rust's `cmd.current_dir(&backend_dir)` reliably sets the right working directory in both modes.
 - `pads.latitude`/`pads.longitude` are plain floats; there is no PostGIS/geospatial extension in use.
 
 ## Data Model (Backend)
@@ -116,7 +116,7 @@ Tables are defined under `backend/app/models`.
 
 **pads**
 
-- `ll2_id`, `name`, `latitude`, `longitude`, `country_code`, `map_url`, `total_launch_count`, `agency_id`
+- `ll2_id`, `name`, `latitude`, `longitude`, `country_code`, `map_url`, `total_launch_count`
 
 **rockets**
 
@@ -398,25 +398,29 @@ Three jobs run on every push/PR to `main`/`develop`:
 
 ## Packaging Notes
 
-Current Tauri bundle resources are configured in `src-tauri/tauri.conf.json`:
+Current Tauri bundle resources are configured in `src-tauri/tauri.conf.json` (object form, so a resource can be pulled in from outside `src-tauri/`):
 
-- `src-tauri/resources/backend/run_backend.exe`
+- `resources/backend/run_backend.exe` — the PyInstaller-frozen backend, built by `backend/tools/build_backend_exe.ps1`.
+- `../backend/seed_data/rocketglobe_seed.db` → `resources/backend/seed_data/rocketglobe_seed.db` — the offline snapshot `seed_if_missing()` copies into place on a fresh install.
 
 Important behavior:
 
 - Debug build: Tauri starts backend via `backend/venv` Python + `uvicorn`. `DATABASE_URL` comes from `backend/.env`, defaulting to `sqlite:///./rocketglobe.db`.
-- Release build: Tauri starts bundled `run_backend.exe` with `DATABASE_URL` pointed at `<app_local_data_dir>/rocketglobe.db` (see `resolve_release_database_url` in `src-tauri/src/lib.rs`), so each user's synced data lives in a single file that persists across app updates.
-- `src-tauri/resources/` is gitignored in this repo, so those artifacts must exist locally before `tauri build`.
+- Release build: Tauri starts bundled `run_backend.exe` with `DATABASE_URL` pointed at `<app_local_data_dir>/rocketglobe.db` (see `resolve_release_database_url` in `src-tauri/src/lib.rs`), so each user's synced data lives in a single file that persists across app updates. `resolve_backend_dir()`'s release branch resolves `resources/backend` (not `backend`) under `BaseDirectory::Resource` — it must match the resource paths above exactly, or the bundled exe silently isn't where Rust expects it and the app panics on launch with "Bundled backend executable not found".
+- `src-tauri/resources/` is gitignored in this repo, so those artifacts must exist locally before `tauri build` — `bun run release:windows` builds them for you (see Windows Release below); a bare `bun run tauri build` does not.
+- `tauri-plugin-single-instance` is registered first in the builder chain (`src-tauri/src/lib.rs`). Without it, a second launch while the first is still cold-starting (PyInstaller onefile extraction takes a few seconds) spawns a second full app + backend racing for port 8000 — the loser fails to bind and shows a "local database did not answer" error that looks like a real crash. A second launch now just focuses the existing window instead.
+
+### CORS and CSP for the packaged webview
+
+Two completely different browser mechanisms gate the packaged app's HTTP calls to its own local backend, and both must be right or the UI silently breaks with no server-side symptom to debug from:
+
+- **CORS** (`CORSMiddleware.allow_origins` in `backend/app/main.py`) must include `http://tauri.localhost` — this is the actual origin a packaged Tauri v2 app uses on Windows, which is a *different string* from both Vite's dev origin (`http://localhost:1420`, why `tauri dev` never catches this class of bug) and the legacy Tauri v1 scheme `tauri://localhost` (easy to add by mistake since it looks more "correct"). Get this wrong and every request from the packaged UI to the backend still completes with a real `200` — the backend logs look completely healthy — but the browser withholds the response from JS with no `Access-Control-Allow-Origin` header to permit it. The frontend then shows "Failed to fetch" with nothing useful in the network tab unless DevTools' console (not just the network panel) is open.
+- **CSP** (`app.security.csp` in `src-tauri/tauri.conf.json`) must allow Cesium's runtime needs, which the permissive `devCsp` (`'unsafe-eval'`) masks entirely in `tauri dev`: `script-src` needs `'wasm-unsafe-eval'` (WebAssembly compilation) **and** `blob:` (not just `worker-src`) — Cesium's geometry-processing Web Workers spawn fine under `worker-src 'self' blob:` alone, but each worker then calls `importScripts()` on a `blob:` URL to load its actual bundled code, and that nested load is governed by `script-src` inherited into the worker's own context, not `worker-src`. Missing the `script-src blob:` piece produces a working app with data loaded but an invisible globe — pad markers render (a different, non-worker pipeline) while every country-outline polygon silently fails to build.
+- Diagnosing either of these in a packaged build requires real console access. The cleanest way, without shipping a debug build: launch the installed exe with `WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS=--remote-debugging-port=9222` set, then attach to `http://127.0.0.1:9222/json` for a list of Chrome DevTools Protocol targets and open a WebSocket to the main page's `webSocketDebuggerUrl` — this works whether or not Tauri's `devtools` Cargo feature is enabled.
 
 ## Windows Release
 
 This path keeps the current architecture: Tauri desktop app + local backend process.
-
-1. Ensure required resource files exist:
-
-- `src-tauri/resources/backend/run_backend.exe`
-
-2. Run the release pipeline:
 
 ```powershell
 bun run release:windows
@@ -436,11 +440,16 @@ What `scripts/release-windows.ps1` does:
 - initializes schema via `init_db()`
 - installs frontend dependencies with `bun install --frozen-lockfile`
 - runs frontend type-check (`bun run check`) unless skipped
+- builds `run_backend.exe` via `backend/tools/build_backend_exe.ps1 -Force` and copies it to `src-tauri/resources/backend/run_backend.exe`
 - runs `bun run tauri build`
 
 Output artifacts are placed under:
 
-- `src-tauri/target/release/bundle`
+- `src-tauri/target/release/bundle` (both `.msi` and NSIS `-setup.exe`)
+
+If only `src-tauri/` changed (no frontend or backend edits), `bun run tauri build` alone is enough — it re-runs `beforeBuildCommand` (`bun run build`) and re-bundles, but skips the backend venv/exe rebuild steps above.
+
+**GitHub Actions release workflow** (`.github/workflows/release.yml`): triggers on pushing a `v*` tag, runs the same `release-windows.ps1` pipeline on a Windows runner, then globs the `.msi`/`.exe` bundle output and publishes them to a GitHub Release via `gh release create --generate-notes`. As of this writing it has only been read, never exercised by an actual tag push — treat a first real release as the first real test of this workflow, not as a known-good path.
 
 ### Runtime Requirements On Target Machines
 
@@ -457,5 +466,5 @@ For full context: most Rust work was heavily assisted (vibe-coded), and much of 
 
 - Backend process management is coupled to Tauri startup and can be fragile across environments.
 - LL2 throttling behavior can still limit how fresh launches data can be in a given sync window, especially on the very first full sync.
-- Release resources (`run_backend.exe`) are expected to exist locally and are not produced by a single unified pipeline in this repo.
+- The GitHub Actions release workflow (`.github/workflows/release.yml`) has not yet been exercised by a real tag push — see Windows Release above.
 - Architectural boundaries between desktop runtime, backend runtime, and data layer are functional but not yet minimal.

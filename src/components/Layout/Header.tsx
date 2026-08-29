@@ -70,6 +70,47 @@ function formatRetryWindow(seconds: number): string {
   return `${hours} hr`;
 }
 
+const SYNC_RESOURCE_LABELS: Record<string, string> = {
+  agencies: "agencies",
+  pads: "pads",
+  rockets: "rockets",
+  launches: "launches",
+};
+
+// The backend's sync stats say exactly what happened per resource - counts,
+// what got skipped because it was synced recently, what got rate-limited -
+// but the UI was collapsing all of that into a content-free "Sync completed."
+// This turns those stats into the one line the user actually wants to read.
+function summarizeSyncStats(stats: unknown): string {
+  if (!stats || typeof stats !== "object") {
+    return "Data refreshed.";
+  }
+
+  const record = stats as Record<string, unknown>;
+  const counted = Object.entries(SYNC_RESOURCE_LABELS)
+    .map(([key, label]): [string, number] => [label, Number(record[key]) || 0])
+    .filter(([, count]) => count > 0);
+
+  if (counted.length > 0) {
+    return `Synced ${counted.map(([label, count]) => `${count} ${label}`).join(", ")}.`;
+  }
+
+  const rateLimited =
+    record._rate_limited && typeof record._rate_limited === "object"
+      ? Object.keys(record._rate_limited as Record<string, unknown>)
+      : [];
+  if (rateLimited.length > 0) {
+    return "Already up to date - LL2 rate limit reached before checking further.";
+  }
+
+  const skipped = Array.isArray(record._skipped) ? record._skipped : [];
+  if (skipped.length > 0) {
+    return "Already up to date, nothing new from LL2.";
+  }
+
+  return "Data refreshed.";
+}
+
 export function Header() {
   const globeMode = useLaunchStore((state) => state.globeMode);
   const setGlobeMode = useLaunchStore((state) => state.setGlobeMode);
@@ -223,7 +264,7 @@ export function Header() {
                 await fetchAllData();
                 showSyncFeedback(
                   "info",
-                  `LL2 rate limit active. Try sync again in about ${formatRetryWindow(retrySeconds)}.`,
+                  `${summarizeSyncStats(data?.run?.stats)} Try sync again in about ${formatRetryWindow(retrySeconds)}.`,
                   12000,
                 );
                 return;
@@ -237,10 +278,8 @@ export function Header() {
                 await fetchAllData();
                 showSyncFeedback(
                   runStatus === "partial" ? "info" : "success",
-                  runStatus === "partial"
-                    ? "Sync partially completed. Data refreshed."
-                    : "Sync completed. Data refreshed.",
-                  6000,
+                  summarizeSyncStats(data?.run?.stats),
+                  8000,
                 );
               } else {
                 const reason =
